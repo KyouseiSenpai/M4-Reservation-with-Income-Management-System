@@ -3,12 +3,6 @@ import java.util.InputMismatchException;
 
 /**
  * Main Class - Entry Point for Theme Park Resort Management System
- *
- * VERSION 4.0.0 - SQLite Database Integration
- * - Replaced all in-memory ArrayList storage with SQLite persistent database
- * - Database file: resort.db (visible and inspectable by professor)
- * - All customer data, tickets, rooms, bookings, transactions persist to disk
- *
  * OOP Concepts Demonstrated:
  * - Abstraction: PaymentFramework abstract class with template method
  * - Inheritance: CreditCardPayment and OnlinePayment extend PaymentFramework
