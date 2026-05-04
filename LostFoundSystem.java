@@ -5,14 +5,6 @@ import java.util.Scanner;
 /**
  * Lost and Found System Class - Manages lost and found items
  * Integrated with housekeeping during room cleaning
- * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation
- * - Fixed potential null pointer exceptions
- * - Added proper error handling
- * - Improved display formatting
- * - Added date validation
  */
 public class LostFoundSystem {
 
@@ -21,7 +13,6 @@ public class LostFoundSystem {
 
     /**
      * Main menu for Lost & Found system
-     * @param sc Scanner instance
      */
     public static void showLostFoundMenu(Scanner sc) {
         int choice;
@@ -75,7 +66,6 @@ public class LostFoundSystem {
 
     /**
      * Housekeeping: Report item found during cleaning
-     * @param sc Scanner instance
      */
     private static void reportFoundItem(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
@@ -144,7 +134,6 @@ public class LostFoundSystem {
 
     /**
      * Guest/Staff: Search for lost item
-     * @param sc Scanner instance
      */
     private static void searchLostItem(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
@@ -203,8 +192,6 @@ public class LostFoundSystem {
 
     /**
      * Search by customer's room history
-     * @param customerID The customer ID
-     * @return Search results
      */
     private static String[][] searchByCustomerHistory(int customerID) {
         System.out.println("\n🔍 Searching items from rooms you've stayed in...");
@@ -228,7 +215,6 @@ public class LostFoundSystem {
 
     /**
      * Display search results
-     * @param results The search results
      */
     private static void displaySearchResults(String[][] results) {
         if (results == null || results.length == 0) {
@@ -262,7 +248,6 @@ public class LostFoundSystem {
 
     /**
      * Claim a lost item
-     * @param sc Scanner instance
      */
     private static void claimItem(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
@@ -420,7 +405,6 @@ public class LostFoundSystem {
 
     /**
      * Admin: Process disposal of old items
-     * @param sc Scanner instance
      */
     private static void processDisposal(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
@@ -479,9 +463,6 @@ public class LostFoundSystem {
 
     /**
      * Quick check for housekeeping - during room checkout
-     * @param roomNumber The room number
-     * @param staffName The staff name
-     * @param sc Scanner instance
      */
     public static void quickCheckDuringCleaning(int roomNumber, String staffName, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
