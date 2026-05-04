@@ -1,12 +1,5 @@
 /**
  * PaymentFramework - Abstract base class for all payment methods
- * Implements Template Method pattern for payment processing
- * 
- * OOP Concepts Demonstrated:
- * - Abstraction: Abstract class with template method
- * - Encapsulation: Protected fields with controlled access
- * - Inheritance: Subclasses extend this framework
- * Created by jepreh torkiza
  */
 public abstract class PaymentFramework {
 
