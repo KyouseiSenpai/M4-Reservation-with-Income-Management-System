@@ -2,10 +2,6 @@ import java.util.Scanner;
 
 /**
  * Membership Class - Handles membership upgrades and benefits
- * 
- * M4 UPDATE: Upgrade payment now uses Payment Framework
- * - VIP upgrade fee goes through CreditCardPayment or OnlinePayment
- * - Transaction is recorded in FinanceManager
  */
 public class membership {
 
