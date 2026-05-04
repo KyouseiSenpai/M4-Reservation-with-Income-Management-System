@@ -1,15 +1,8 @@
 import java.util.Scanner;
 
 /**
- * Room Control System Class - Simulates IoT smart room controls
- * Guests can control room settings via the customer portal
- * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation
- * - Fixed potential null pointer exceptions
- * - Added proper error handling
- * - Improved display formatting
+ Room Control System Class - Simulates IoT smart room controls
+ Guests can control room settings via the customer portal
  */
 public class RoomControlSystem {
 
@@ -18,18 +11,14 @@ public class RoomControlSystem {
     private static final double MAX_TEMP = 30.0;
     private static final double DEFAULT_TEMP = 22.0;
 
-    /**
-     * Show room controls for a guest
-     * @param customerID The customer ID
-     * @param sc Scanner instance
-     */
+// Show room controls for a guest
     public static void showRoomControls(int customerID, Scanner sc) {
         // Check if guest has an active booking
         int roomNumber = repo.getCurrentGuestRoom(customerID);
         if (roomNumber == -1) {
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║  ℹ️  You don't have an active room booking.                  ║");
-            System.out.println("║     Book a room to access room controls.                     ║");
+            System.out.println("║            You don't have an active room booking.            ║");
+            System.out.println("║             Book a room to access room controls.             ║");
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
             pauseScreen(sc);
             return;
@@ -43,19 +32,19 @@ public class RoomControlSystem {
             Repository.RoomStatus status = getRoomStatus(roomNumber);
 
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.printf("║              🎛️  ROOM %d CONTROLS%n", roomNumber);
+            System.out.printf("║                 ROOM %d CONTROLS%n", roomNumber);
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             System.out.println("║                                                              ║");
-            System.out.println("║  --- Climate ---                                             ║");
+            System.out.println("║                        --- Climate ---                       ║");
             System.out.printf("║  [1] Temperature: %.1f°C %s%n", status.temperature, getTempEmoji(status.temperature));
             System.out.println("║                                                              ║");
-            System.out.println("║  --- Lighting ---                                            ║");
+            System.out.println("║                        --- Lighting ---                      ║");
             System.out.println("║  [2] Lights: " + (status.lightsOn ? "ON 💡" : "OFF 🌑"));
             System.out.println("║                                                              ║");
-            System.out.println("║  --- Privacy ---                                             ║");
+            System.out.println("║                        --- Privacy ---                       ║");
             System.out.println("║  [3] Do Not Disturb: " + (status.dndStatus ? "ON 🔴" : "OFF 🟢"));
             System.out.println("║                                                              ║");
-            System.out.println("║  --- Services ---                                            ║");
+            System.out.println("║                        --- Services ---                      ║");
             System.out.println("║  [4] Request Housekeeping                                    ║");
             System.out.println("║  [5] Request Fresh Towels                                    ║");
             System.out.println("║  [6] Report Maintenance Issue                                ║");
@@ -95,15 +84,10 @@ public class RoomControlSystem {
         } while (inMenu);
     }
 
-    /**
-     * Adjust room temperature
-     * @param roomNumber The room number
-     * @param currentTemp Current temperature from Repository.RoomStatus
-     * @param sc Scanner instance
-     */
+// Adjust room temperature
     private static void adjustTemperature(int roomNumber, double currentTemp, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           🌡️  TEMPERATURE CONTROL                            ║");
+        System.out.println("║                      TEMPERATURE CONTROL                     ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.printf("║  Current: %.1f°C%n", currentTemp);
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
@@ -136,20 +120,16 @@ public class RoomControlSystem {
         }
 
         if (repo.updateRoomTemperature(roomNumber, newTemp)) {
-            System.out.printf("\n✅ Temperature set to %.1f°C%n", newTemp);
+            System.out.printf("\nTemperature set to %.1f°C%n", newTemp);
             System.out.println("   Your room will reach this temperature shortly.");
         } else {
-            System.out.println("\n❌ Failed to set temperature.");
+            System.out.println("\nFailed to set temperature.");
         }
         
         pauseScreen(sc);
     }
 
-    /**
-     * Toggle room lights
-     * @param roomNumber The room number
-     * @param currentlyOn Current light state
-     */
+// Toggle room lights
     private static void toggleLights(int roomNumber, boolean currentlyOn) {
         boolean newState = !currentlyOn;
         
@@ -166,37 +146,28 @@ public class RoomControlSystem {
         }
     }
 
-    /**
-     * Toggle Do Not Disturb
-     * @param roomNumber The room number
-     * @param currentlyOn Current DND state
-     */
+// Toggle Do Not Disturb
     private static void toggleDND(int roomNumber, boolean currentlyOn) {
         boolean newState = !currentlyOn;
         
         if (repo.updateRoomDND(roomNumber, newState)) {
             if (newState) {
-                System.out.println("\n✅ Do Not Disturb is ON 🔴");
+                System.out.println("\nDo Not Disturb is ON 🔴");
                 System.out.println("   Housekeeping will skip your room.");
                 System.out.println("   Hang the DND sign on your door.");
             } else {
-                System.out.println("\n✅ Do Not Disturb is OFF 🟢");
+                System.out.println("\nDo Not Disturb is OFF 🟢");
                 System.out.println("   Housekeeping may clean your room.");
             }
         } else {
-            System.out.println("\n❌ Failed to toggle DND.");
+            System.out.println("\nFailed to toggle DND.");
         }
     }
 
-    /**
-     * Request housekeeping service
-     * @param roomNumber The room number
-     * @param customerID The customer ID
-     * @param sc Scanner instance
-     */
+// Request housekeeping service
     private static void requestHousekeeping(int roomNumber, int customerID, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           🧹 HOUSEKEEPING REQUEST                            ║");
+        System.out.println("║                     HOUSEKEEPING REQUEST                     ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║  When would you like service?                                ║");
         System.out.println("║  [1] Right now (if DND is off)                               ║");
@@ -235,7 +206,7 @@ public class RoomControlSystem {
         String notes = sc.nextLine().trim();
 
         if (repo.createGuestHousekeepingRequest(roomNumber, customerID, when, notes)) {
-            System.out.println("\n✅ Housekeeping request submitted!");
+            System.out.println("\nHousekeeping request submitted!");
             System.out.println("   Room: " + roomNumber);
             System.out.println("   When: " + when);
             if (!notes.isEmpty()) {
@@ -243,21 +214,16 @@ public class RoomControlSystem {
             }
             System.out.println("   You'll receive a notification when we're on our way.");
         } else {
-            System.out.println("\n❌ Failed to submit housekeeping request.");
+            System.out.println("\nFailed to submit housekeeping request.");
         }
         
         pauseScreen(sc);
     }
 
-    /**
-     * Request fresh towels
-     * @param roomNumber The room number
-     * @param customerID The customer ID
-     * @param sc Scanner instance
-     */
+// Request fresh towels
     private static void requestTowels(int roomNumber, int customerID, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           🧺 FRESH TOWELS REQUEST                            ║");
+        System.out.println("║                      FRESH TOWELS REQUEST                    ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║  How many towels?                                            ║");
         System.out.println("║  [1] 2 towels (standard)                                     ║");
@@ -285,24 +251,19 @@ public class RoomControlSystem {
         }
 
         if (repo.createTowelRequest(roomNumber, customerID, towelCount)) {
-            System.out.println("\n✅ Towel request submitted!");
+            System.out.println("\nTowel request submitted!");
             System.out.println("   " + towelCount + " fresh towels will be delivered shortly.");
         } else {
-            System.out.println("\n❌ Failed to submit towel request.");
+            System.out.println("\nFailed to submit towel request.");
         }
         
         pauseScreen(sc);
     }
 
-    /**
-     * Report maintenance issue from room
-     * @param roomNumber The room number
-     * @param customerID The customer ID
-     * @param sc Scanner instance
-     */
+// Report maintenance issue from room
     private static void reportRoomIssue(int roomNumber, int customerID, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           🔧 REPORT ROOM ISSUE                               ║");
+        System.out.println("║                      REPORT ROOM ISSUE                       ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║  What type of issue?                                         ║");
         System.out.println("║  [1] Air Conditioning / Heating                              ║");
@@ -340,14 +301,14 @@ public class RoomControlSystem {
 
         if (repo.reportMaintenanceIssueWithSeverity(facilityName, issueType, description, guestName, severity)) {
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║              ✅ ISSUE REPORTED!                              ║");
+            System.out.println("║                       ISSUE REPORTED!                        ║");
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             System.out.printf("║  Type: %-54s ║%n", issueType);
             System.out.printf("║  Severity: %-50s ║%n", severity);
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             
             if (urgency == 1) {
-                System.out.println("║  ⚠️  EMERGENCY: Maintenance will respond within 15 minutes!  ║");
+                System.out.println("║      EMERGENCY: Maintenance will respond within 15 minutes!  ║");
             } else if (urgency == 2) {
                 System.out.println("║  Maintenance will respond within 1 hour.                     ║");
             } else {
@@ -355,38 +316,28 @@ public class RoomControlSystem {
             }
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
         } else {
-            System.out.println("\n❌ Failed to report issue.");
+            System.out.println("\nFailed to report issue.");
         }
         
         pauseScreen(sc);
     }
 
-    /**
-     * Get room status from repository
-     * @param roomNumber The room number
-     * @return RoomStatus object
-     */
+// Get room status from repository
     private static Repository.RoomStatus getRoomStatus(int roomNumber) {
         return repo.getRoomStatus(roomNumber);
     }
 
-    /**
-     * Get emoji for temperature
-     * @param temp Temperature value
-     * @return Emoji string
-     */
+// Get emoji for temperature
     private static String getTempEmoji(double temp) {
         if (temp < 18) return "❄️";
         if (temp > 25) return "🔥";
         return "😊";
     }
 
-    /**
-     * Admin: View all room statuses
-     */
+// Admin: View all room statuses
     public static void showAllRoomStatuses() {
         System.out.println("\n╔════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                    📊 LIVE ROOM STATUS DASHBOARD                       ║");
+        System.out.println("║                       LIVE ROOM STATUS DASHBOARD                       ║");
         System.out.println("╠════════════════════════════════════════════════════════════════════════╣");
         System.out.printf("║ %-8s │ %-8s │ %-10s │ %-8s │ %-20s │ %-12s ║%n",
                 "Room", "Temp", "Lights", "DND", "Last Request", "Status");
@@ -409,7 +360,6 @@ public class RoomControlSystem {
     }
 
     // Helper methods
-    
     private static int getValidIntInput(Scanner sc, String prompt, int min, int max) {
         System.out.print(prompt);
         int input = -1;
