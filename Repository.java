@@ -8,238 +8,230 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Repository Class - SQLite Data Access Layer
- * Implements Singleton pattern for SQLite database management
- *
- * All data is stored in a local SQLite file (resort.db) that the professor can inspect.
- * No ArrayLists are used for persistent data storage.
- *
- * TABLES (SQLite):
- *  - customers        (Guest accounts & membership)
- *  - ticketRecords    (Ticket purchases)
- *  - repoTransactions (Financial transactions stored by Repository)
- *  - queue            (Queue entries)
- *  - rooms            (Room inventory)
- *  - roomBookings     (Room reservations)
- *  - roomStatuses     (IoT room controls)
- *  - housekeeping     (Cleaning tasks)
- *  - maintenance      (Facility issues)
- *  - facilities       (Park facilities)
- *  - lostFound        (Lost & found items)
+ Repository Class - Database Access Layer
+ Implements Singleton pattern for database connection management
  */
+
 public class Repository {
 
     private static final Logger LOGGER = Logger.getLogger(Repository.class.getName());
-    private static final String DB_URL = "jdbc:sqlite:resort.db";
+    private final String dbURL;
     private static Repository instance;
     private static final Object lock = new Object();
 
-    // ============ AUTO INCREMENT COUNTERS (kept in memory, IDs stored in DB) ============
-    private int nextTicketID = 1;
-    private int nextTransactionID = 1;
-    private int nextQueueID = 1;
-    private int nextBookingID = 1;
-    private int nextStatusID = 1;
-    private int nextTaskID = 1;
-    private int nextIssueID = 1;
-    private int nextFacilityID = 1;
-    private int nextItemID = 1;
-
-    private Repository() {
+    private Repository(String dbURL) {
+        this.dbURL = dbURL;
         initializeDatabase();
-        LOGGER.info("SQLite database initialized successfully at " + DB_URL);
     }
 
+// Thread-safe singleton instance getter
     public static Repository getInstance() {
         if (instance == null) {
             synchronized (lock) {
                 if (instance == null) {
-                    instance = new Repository();
+                    String userHome = System.getProperty("user.home");
+                    String dbURL = "jdbc:sqlite:" + userHome + "/theme_park_resort.db";
+                    instance = new Repository(dbURL);
                 }
             }
         }
         return instance;
     }
 
-    // ============ DATABASE INITIALIZATION ============
-
-    private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(DB_URL);
+// Get database connection with error handling
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(dbURL);
     }
 
+// Initialize database with required tables
     private void initializeDatabase() {
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            conn.setAutoCommit(false);
+        String[] createTables = {
+            // Customer Details Table
+            "CREATE TABLE IF NOT EXISTS tbl_customerDetails (" +
+                "customerID INTEGER PRIMARY KEY, " +
+                "customerFullName TEXT NOT NULL, " +
+                "customerContactNumber TEXT NOT NULL, " +
+                "customerAge INTEGER NOT NULL CHECK(customerAge >= 0 AND customerAge <= 120), " +
+                "accountDateCreated TEXT NOT NULL, " +
+                "dateTimeIn TEXT, " +
+                "dateTimeOut TEXT, " +
+                "accountStatus TEXT DEFAULT 'ACTIVE')",
 
-            // Create customers table
-            stmt.execute("CREATE TABLE IF NOT EXISTS customers ("
-                    + "customerID INTEGER PRIMARY KEY,"
-                    + "customerFullName TEXT NOT NULL,"
-                    + "customerContactNumber TEXT,"
-                    + "customerAge INTEGER,"
-                    + "accountDateCreated TEXT,"
-                    + "dateTimeIn TEXT,"
-                    + "dateTimeOut TEXT,"
-                    + "accountStatus TEXT DEFAULT 'ACTIVE',"
-                    + "membershipType TEXT DEFAULT 'Regular',"
-                    + "customerPoints INTEGER DEFAULT 0,"
-                    + "freebiesCount INTEGER DEFAULT 0,"
-                    + "ticketBought INTEGER DEFAULT 0,"
-                    + "totalCost REAL DEFAULT 0)");
+            // Customer Records Table
+            "CREATE TABLE IF NOT EXISTS tbl_customerRecords (" +
+                "recordID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "customerID INTEGER NOT NULL UNIQUE, " +
+                "membershipType TEXT DEFAULT 'Regular', " +
+                "customerPoints INTEGER DEFAULT 0, " +
+                "freebiesCount INTEGER DEFAULT 0, " +
+                "ticketBought INTEGER DEFAULT 0, " +
+                "totalCost REAL DEFAULT 0.0, " +
+                "FOREIGN KEY (customerID) REFERENCES tbl_customerDetails(customerID) ON DELETE CASCADE)",
 
-            // Create ticketRecords table
-            stmt.execute("CREATE TABLE IF NOT EXISTS ticketRecords ("
-                    + "ticketID INTEGER PRIMARY KEY,"
-                    + "customerID INTEGER,"
-                    + "dateBought TEXT,"
-                    + "ticketAge INTEGER,"
-                    + "ticketName TEXT,"
-                    + "ticketType TEXT,"
-                    + "ticketPrice REAL,"
-                    + "appointmentDate TEXT,"
-                    + "paymentStatus TEXT)");
+            // Ticket Records Table
+            "CREATE TABLE IF NOT EXISTS tbl_ticketRecords (" +
+                "ticketID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "customerID INTEGER NOT NULL, " +
+                "dateBought TEXT NOT NULL, " +
+                "ticketAge INTEGER NOT NULL, " +
+                "ticketName TEXT NOT NULL, " +
+                "ticketType TEXT, " +
+                "ticketPrice REAL NOT NULL, " +
+                "appointmentDate TEXT, " +
+                "paymentStatus TEXT DEFAULT 'PENDING', " +
+                "FOREIGN KEY (customerID) REFERENCES tbl_customerDetails(customerID) ON DELETE CASCADE)",
 
-            // Create repoTransactions table
-            stmt.execute("CREATE TABLE IF NOT EXISTS repoTransactions ("
-                    + "transactionID INTEGER PRIMARY KEY,"
-                    + "customerID INTEGER,"
-                    + "transactionDate TEXT,"
-                    + "transactionType TEXT,"
-                    + "description TEXT,"
-                    + "amount REAL,"
-                    + "pointsEarned INTEGER,"
-                    + "receiptData TEXT)");
+            // Transaction History Table
+            "CREATE TABLE IF NOT EXISTS tbl_transactionHistory (" +
+                "transactionID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "customerID INTEGER NOT NULL, " +
+                "transactionDate TEXT NOT NULL, " +
+                "transactionType TEXT NOT NULL, " +
+                "description TEXT, " +
+                "amount REAL NOT NULL, " +
+                "pointsEarned INTEGER DEFAULT 0, " +
+                "receiptData TEXT, " +
+                "FOREIGN KEY (customerID) REFERENCES tbl_customerDetails(customerID) ON DELETE CASCADE)",
 
-            // Create queue table
-            stmt.execute("CREATE TABLE IF NOT EXISTS queue ("
-                    + "queueID INTEGER PRIMARY KEY,"
-                    + "customerID INTEGER,"
-                    + "className TEXT,"
-                    + "membershipType TEXT,"
-                    + "queuePosition INTEGER,"
-                    + "status TEXT,"
-                    + "timestamp TEXT)");
+            // Queue Table
+            "CREATE TABLE IF NOT EXISTS tbl_queue (" +
+                "queueID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "customerID INTEGER NOT NULL, " +
+                "className TEXT NOT NULL, " +
+                "membershipType TEXT DEFAULT 'REGULAR', " +
+                "queuePosition INTEGER NOT NULL, " +
+                "status TEXT DEFAULT 'WAITING', " +
+                "timestamp TEXT NOT NULL, " +
+                "FOREIGN KEY (customerID) REFERENCES tbl_customerDetails(customerID) ON DELETE CASCADE)",
 
-            // Create rooms table
-            stmt.execute("CREATE TABLE IF NOT EXISTS rooms ("
-                    + "roomNumber INTEGER PRIMARY KEY,"
-                    + "roomType TEXT,"
-                    + "capacity INTEGER,"
-                    + "pricePerNight REAL,"
-                    + "status TEXT DEFAULT 'AVAILABLE',"
-                    + "currentGuestID INTEGER DEFAULT 0,"
-                    + "checkInDate TEXT,"
-                    + "checkOutDate TEXT,"
-                    + "guestCount INTEGER DEFAULT 0,"
-                    + "floorNumber INTEGER,"
-                    + "hasView INTEGER DEFAULT 0,"
-                    + "isQuietZone INTEGER DEFAULT 0,"
-                    + "nearElevator INTEGER DEFAULT 0)");
+            // Rooms Table
+            "CREATE TABLE IF NOT EXISTS tbl_rooms (" +
+                "roomNumber INTEGER PRIMARY KEY, " +
+                "roomType TEXT NOT NULL, " +
+                "capacity INTEGER NOT NULL, " +
+                "pricePerNight REAL NOT NULL, " +
+                "status TEXT DEFAULT 'AVAILABLE', " +
+                "currentGuestID INTEGER, " +
+                "checkInDate TEXT, " +
+                "checkOutDate TEXT, " +
+                "guestCount INTEGER DEFAULT 0, " +
+                "floorNumber INTEGER, " +
+                "hasView INTEGER DEFAULT 0, " +
+                "isQuietZone INTEGER DEFAULT 0, " +
+                "nearElevator INTEGER DEFAULT 0, " +
+                "FOREIGN KEY (currentGuestID) REFERENCES tbl_customerDetails(customerID) ON DELETE SET NULL)",
 
-            // Create roomBookings table
-            stmt.execute("CREATE TABLE IF NOT EXISTS roomBookings ("
-                    + "bookingID INTEGER PRIMARY KEY,"
-                    + "roomNumber INTEGER,"
-                    + "customerID INTEGER,"
-                    + "checkInDate TEXT,"
-                    + "checkOutDate TEXT,"
-                    + "guestCount INTEGER,"
-                    + "bookingStatus TEXT,"
-                    + "actualCheckOut TEXT)");
+            // Room Bookings Table
+            "CREATE TABLE IF NOT EXISTS tbl_roomBookings (" +
+                "bookingID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "roomNumber INTEGER NOT NULL, " +
+                "customerID INTEGER NOT NULL, " +
+                "checkInDate TEXT NOT NULL, " +
+                "checkOutDate TEXT NOT NULL, " +
+                "guestCount INTEGER NOT NULL, " +
+                "bookingStatus TEXT DEFAULT 'CONFIRMED', " +
+                "actualCheckOut TEXT, " +
+                "FOREIGN KEY (roomNumber) REFERENCES tbl_rooms(roomNumber) ON DELETE CASCADE, " +
+                "FOREIGN KEY (customerID) REFERENCES tbl_customerDetails(customerID) ON DELETE CASCADE)",
 
-            // Create roomStatuses table
-            stmt.execute("CREATE TABLE IF NOT EXISTS roomStatuses ("
-                    + "statusID INTEGER PRIMARY KEY,"
-                    + "roomNumber INTEGER UNIQUE,"
-                    + "temperature REAL DEFAULT 22.0,"
-                    + "lightsOn INTEGER DEFAULT 1,"
-                    + "dndStatus INTEGER DEFAULT 0,"
-                    + "lastGuestRequest TEXT,"
-                    + "requestTime TEXT)");
+            // Room Status Table (IoT)
+            "CREATE TABLE IF NOT EXISTS tbl_roomStatus (" +
+                "statusID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "roomNumber INTEGER NOT NULL UNIQUE, " +
+                "temperature REAL DEFAULT 22.0, " +
+                "lightsOn INTEGER DEFAULT 1, " +
+                "dndStatus INTEGER DEFAULT 0, " +
+                "lastGuestRequest TEXT, " +
+                "requestTime TEXT, " +
+                "FOREIGN KEY (roomNumber) REFERENCES tbl_rooms(roomNumber) ON DELETE CASCADE)",
 
-            // Create housekeeping table
-            stmt.execute("CREATE TABLE IF NOT EXISTS housekeeping ("
-                    + "taskID INTEGER PRIMARY KEY,"
-                    + "roomNumber INTEGER,"
-                    + "staffName TEXT,"
-                    + "taskDate TEXT,"
-                    + "priority TEXT,"
-                    + "status TEXT DEFAULT 'PENDING',"
-                    + "completionDate TEXT,"
-                    + "notes TEXT)");
+            // Housekeeping Table
+            "CREATE TABLE IF NOT EXISTS tbl_housekeeping (" +
+                "taskID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "roomNumber INTEGER NOT NULL, " +
+                "staffName TEXT NOT NULL, " +
+                "taskDate TEXT NOT NULL, " +
+                "priority TEXT DEFAULT 'MEDIUM', " +
+                "status TEXT DEFAULT 'PENDING', " +
+                "completionDate TEXT, " +
+                "notes TEXT, " +
+                "FOREIGN KEY (roomNumber) REFERENCES tbl_rooms(roomNumber) ON DELETE CASCADE)",
 
-            // Create maintenance table
-            stmt.execute("CREATE TABLE IF NOT EXISTS maintenance ("
-                    + "issueID INTEGER PRIMARY KEY,"
-                    + "facilityName TEXT,"
-                    + "issueType TEXT,"
-                    + "description TEXT,"
-                    + "reportedBy TEXT,"
-                    + "reportDate TEXT,"
-                    + "assignedTo TEXT,"
-                    + "status TEXT DEFAULT 'PENDING',"
-                    + "severity TEXT,"
-                    + "resolution TEXT,"
-                    + "completionDate TEXT,"
-                    + "responseTimeMinutes INTEGER DEFAULT 0)");
+            // Maintenance Table
+            "CREATE TABLE IF NOT EXISTS tbl_maintenance (" +
+                "issueID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "facilityName TEXT NOT NULL, " +
+                "issueType TEXT NOT NULL, " +
+                "description TEXT NOT NULL, " +
+                "reportedBy TEXT NOT NULL, " +
+                "reportDate TEXT NOT NULL, " +
+                "assignedTo TEXT, " +
+                "status TEXT DEFAULT 'PENDING', " +
+                "severity TEXT DEFAULT 'LOW', " +
+                "resolution TEXT, " +
+                "completionDate TEXT, " +
+                "responseTimeMinutes INTEGER)",
 
-            // Create facilities table
-            stmt.execute("CREATE TABLE IF NOT EXISTS facilities ("
-                    + "facilityID INTEGER PRIMARY KEY,"
-                    + "facilityName TEXT UNIQUE,"
-                    + "facilityType TEXT,"
-                    + "location TEXT,"
-                    + "operatingHours TEXT,"
-                    + "status TEXT DEFAULT 'OPERATIONAL',"
-                    + "totalCycles INTEGER DEFAULT 0,"
-                    + "cycleThreshold INTEGER DEFAULT 1000,"
-                    + "nextScheduledMaintenance TEXT)");
+            // Facilities Table
+            "CREATE TABLE IF NOT EXISTS tbl_facilities (" +
+                "facilityID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "facilityName TEXT NOT NULL UNIQUE, " +
+                "facilityType TEXT NOT NULL, " +
+                "location TEXT NOT NULL, " +
+                "operatingHours TEXT, " +
+                "status TEXT DEFAULT 'OPERATIONAL', " +
+                "totalCycles INTEGER DEFAULT 0, " +
+                "cycleThreshold INTEGER DEFAULT 1000, " +
+                "nextScheduledMaintenance TEXT)",
 
-            // Create lostFound table
-            stmt.execute("CREATE TABLE IF NOT EXISTS lostFound ("
-                    + "itemID INTEGER PRIMARY KEY,"
-                    + "roomNumber INTEGER,"
-                    + "dateFound TEXT,"
-                    + "itemCategory TEXT,"
-                    + "itemDescription TEXT,"
-                    + "foundBy TEXT,"
-                    + "storageLocation TEXT,"
-                    + "status TEXT DEFAULT 'FOUND',"
-                    + "claimedBy INTEGER DEFAULT 0,"
-                    + "claimDate TEXT,"
-                    + "claimantName TEXT,"
-                    + "disposalReason TEXT,"
-                    + "disposalDate TEXT)");
+            // Lost and Found Table
+            "CREATE TABLE IF NOT EXISTS tbl_lostFound (" +
+                "itemID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "roomNumber INTEGER, " +
+                "dateFound TEXT NOT NULL, " +
+                "itemCategory TEXT NOT NULL, " +
+                "itemDescription TEXT NOT NULL, " +
+                "foundBy TEXT NOT NULL, " +
+                "storageLocation TEXT NOT NULL, " +
+                "status TEXT DEFAULT 'FOUND', " +
+                "claimedBy INTEGER, " +
+                "claimDate TEXT, " +
+                "claimantName TEXT, " +
+                "disposalReason TEXT, " +
+                "disposalDate TEXT, " +
+                "FOREIGN KEY (roomNumber) REFERENCES tbl_rooms(roomNumber) ON DELETE SET NULL, " +
+                "FOREIGN KEY (claimedBy) REFERENCES tbl_customerDetails(customerID) ON DELETE SET NULL)"
+        };
 
-            // Create transactionHistory table (used by transactionHistory.java)
-            stmt.execute("CREATE TABLE IF NOT EXISTS transactionHistory ("
-                    + "historyID INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + "customerID INTEGER,"
-                    + "receiptData TEXT,"
-                    + "totalAmount REAL,"
-                    + "totalPoints INTEGER,"
-                    + "transactionDate TEXT)");
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
 
-            conn.commit();
-            initializeDefaults(conn);
-            conn.commit();  // Commit room/facility inserts
-            loadNextIDs(conn);
+            // Enable foreign keys
+            stmt.execute("PRAGMA foreign_keys = ON");
+
+            // Create all tables
+            for (String sql : createTables) {
+                stmt.execute(sql);
+            }
+
+            // Initialize default rooms if empty
+            initializeDefaultRooms(conn);
+            initializeDefaultFacilities(conn);
+
+            LOGGER.info("Database initialized successfully");
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Database initialization failed", e);
-            throw new RuntimeException("Failed to initialize database", e);
+            LOGGER.log(Level.SEVERE, "Database initialization error: " + e.getMessage(), e);
         }
     }
 
-    private void initializeDefaults(Connection conn) throws SQLException {
-        // Check if rooms already exist
-        try (Statement check = conn.createStatement();
-             ResultSet rs = check.executeQuery("SELECT COUNT(*) FROM rooms")) {
-            if (rs.next() && rs.getInt(1) > 0) {
-                return; // Defaults already initialized
-            }
+    private void initializeDefaultRooms(Connection conn) throws SQLException {
+        String checkSql = "SELECT COUNT(*) FROM tbl_rooms";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(checkSql)) {
+            if (rs.next() && rs.getInt(1) > 0) return;
         }
 
-        // Initialize default rooms (5 floors x 4 types)
+        String insertSql = "INSERT INTO tbl_rooms (roomNumber, roomType, capacity, pricePerNight, status, floorNumber, hasView, isQuietZone, nearElevator) VALUES (?, ?, ?, ?, 'AVAILABLE', ?, ?, ?, ?)";
         String[] roomTypes = {"Standard", "Deluxe", "Suite", "Family"};
         double[] prices = {2500.0, 3500.0, 5500.0, 4500.0};
         int[] capacities = {2, 2, 4, 6};
@@ -247,30 +239,35 @@ public class Repository {
         int[] isQuiet = {1, 1, 0, 0};
         int[] nearElev = {0, 0, 0, 1};
 
-        String sql = "INSERT INTO rooms (roomNumber, roomType, capacity, pricePerNight, status, floorNumber, hasView, isQuietZone, nearElevator) VALUES (?,?,?,?,?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
             int roomNum = 101;
             for (int floor = 1; floor <= 5; floor++) {
                 for (int i = 0; i < 4; i++) {
-                    ps.setInt(1, roomNum);
-                    ps.setString(2, roomTypes[i]);
-                    ps.setInt(3, capacities[i]);
-                    ps.setDouble(4, prices[i]);
-                    ps.setString(5, "AVAILABLE");
-                    ps.setInt(6, floor);
-                    ps.setInt(7, hasView[i]);
-                    ps.setInt(8, isQuiet[i]);
-                    ps.setInt(9, nearElev[i]);
-                    ps.addBatch();
+                    pstmt.setInt(1, roomNum);
+                    pstmt.setString(2, roomTypes[i]);
+                    pstmt.setInt(3, capacities[i]);
+                    pstmt.setDouble(4, prices[i]);
+                    pstmt.setInt(5, floor);
+                    pstmt.setInt(6, hasView[i]);
+                    pstmt.setInt(7, isQuiet[i]);
+                    pstmt.setInt(8, nearElev[i]);
+                    pstmt.executeUpdate();
                     roomNum++;
                 }
                 roomNum = (floor + 1) * 100 + 1;
             }
-            ps.executeBatch();
+        }
+    }
+
+    private void initializeDefaultFacilities(Connection conn) throws SQLException {
+        String checkSql = "SELECT COUNT(*) FROM tbl_facilities";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(checkSql)) {
+            if (rs.next() && rs.getInt(1) > 0) return;
         }
 
-        // Initialize default facilities
-        String[][] facilityData = {
+        String insertSql = "INSERT OR IGNORE INTO tbl_facilities (facilityName, facilityType, location, operatingHours, status, cycleThreshold) VALUES (?, ?, ?, ?, 'OPERATIONAL', ?)";
+        String[][] facilities = {
             {"Roller Coaster", "Ride", "Zone A", "09:00-21:00", "500"},
             {"Ferris Wheel", "Ride", "Zone A", "09:00-21:00", "300"},
             {"Water Slide", "Ride", "Zone B", "10:00-18:00", "400"},
@@ -279,57 +276,40 @@ public class Repository {
             {"Swimming Pool", "Facility", "Zone B", "08:00-20:00", "500"},
             {"Arcade", "Facility", "Zone C", "10:00-23:00", "1500"}
         };
-        String facSql = "INSERT INTO facilities (facilityID, facilityName, facilityType, location, operatingHours, status, cycleThreshold) VALUES (?,?,?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(facSql)) {
-            for (String[] f : facilityData) {
-                ps.setInt(1, nextFacilityID++);
-                ps.setString(2, f[0]);
-                ps.setString(3, f[1]);
-                ps.setString(4, f[2]);
-                ps.setString(5, f[3]);
-                ps.setString(6, "OPERATIONAL");
-                ps.setInt(7, Integer.parseInt(f[4]));
-                ps.addBatch();
+
+        try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+            for (String[] facility : facilities) {
+                pstmt.setString(1, facility[0]);
+                pstmt.setString(2, facility[1]);
+                pstmt.setString(3, facility[2]);
+                pstmt.setString(4, facility[3]);
+                pstmt.setInt(5, Integer.parseInt(facility[4]));
+                pstmt.executeUpdate();
             }
-            ps.executeBatch();
         }
-    }
-
-    private void loadNextIDs(Connection conn) throws SQLException {
-        // Load max IDs from database to keep counters in sync
-        nextTicketID = getMaxID(conn, "ticketRecords", "ticketID") + 1;
-        nextTransactionID = getMaxID(conn, "repoTransactions", "transactionID") + 1;
-        nextQueueID = getMaxID(conn, "queue", "queueID") + 1;
-        nextBookingID = getMaxID(conn, "roomBookings", "bookingID") + 1;
-        nextStatusID = getMaxID(conn, "roomStatuses", "statusID") + 1;
-        nextTaskID = getMaxID(conn, "housekeeping", "taskID") + 1;
-        nextIssueID = getMaxID(conn, "maintenance", "issueID") + 1;
-        nextFacilityID = getMaxID(conn, "facilities", "facilityID") + 1;
-        nextItemID = getMaxID(conn, "lostFound", "itemID") + 1;
-    }
-
-    private int getMaxID(Connection conn, String table, String column) throws SQLException {
-        String sql = "SELECT COALESCE(MAX(" + column + "), 0) FROM " + table;
-        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) return rs.getInt(1);
-        }
-        return 0;
     }
 
     // ============ CUSTOMER METHODS ============
 
     public int generateCustomerID() {
+        int customerID = 10000;
+        String sql = "SELECT customerID FROM tbl_customerDetails ORDER BY customerID ASC";
+
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(customerID), 9999) FROM customers")) {
-            if (rs.next()) {
-                int max = rs.getInt(1);
-                return Math.max(10000, max + 1);
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                if (rs.getInt("customerID") == customerID) {
+                    customerID++;
+                } else {
+                    break;
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "generateCustomerID failed", e);
+            LOGGER.log(Level.SEVERE, "Error generating customer ID: " + e.getMessage(), e);
         }
-        return 10000;
+        return customerID;
     }
 
     public boolean saveCustomer(int customerID, String fullName, String contactNumber, int age) {
@@ -340,46 +320,62 @@ public class Repository {
             return false;
         }
 
-        String sql = "INSERT INTO customers (customerID, customerFullName, customerContactNumber, customerAge, accountDateCreated, accountStatus, membershipType, customerPoints, freebiesCount, ticketBought, totalCost) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            ps.setString(2, fullName.trim());
-            ps.setString(3, contactNumber.trim());
-            ps.setInt(4, age);
-            ps.setString(5, LocalDate.now().toString());
-            ps.setString(6, "ACTIVE");
-            ps.setString(7, "Regular");
-            ps.setInt(8, 0);
-            ps.setInt(9, 0);
-            ps.setInt(10, 0);
-            ps.setDouble(11, 0.0);
-            ps.executeUpdate();
+        String registrationDate = LocalDate.now().toString();
+        String sql = "INSERT INTO tbl_customerDetails (accountDateCreated, customerID, customerFullName, customerContactNumber, customerAge) VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, registrationDate);
+            pstmt.setInt(2, customerID);
+            pstmt.setString(3, fullName.trim());
+            pstmt.setString(4, contactNumber.trim());
+            pstmt.setInt(5, age);
+            pstmt.executeUpdate();
+
+            // Create customer record
+            String recordSql = "INSERT INTO tbl_customerRecords (customerID, membershipType, freebiesCount) VALUES (?, 'Regular', 0)";
+            try (PreparedStatement recordPstmt = conn.prepareStatement(recordSql)) {
+                recordPstmt.setInt(1, customerID);
+                recordPstmt.executeUpdate();
+            }
+
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "saveCustomer failed", e);
+            LOGGER.log(Level.SEVERE, "Error saving customer: " + e.getMessage(), e);
             return false;
         }
     }
 
     public int findCustomerByID(int loginID) {
-        if (loginID < 10000 || loginID > 99999) return -1;
-        String sql = "SELECT customerID FROM customers WHERE customerID = ? AND accountStatus = 'ACTIVE'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, loginID);
-            try (ResultSet rs = ps.executeQuery()) {
+        if (loginID < 10000 || loginID > 99999) {
+            return -1;
+        }
+
+        String sql = "SELECT customerID, customerFullName FROM tbl_customerDetails WHERE customerID = ? AND accountStatus = 'ACTIVE'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, loginID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    String formattedLDT = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
-                    try (PreparedStatement upd = conn.prepareStatement("UPDATE customers SET dateTimeIn = ? WHERE customerID = ?")) {
-                        upd.setString(1, formattedLDT);
-                        upd.setInt(2, loginID);
-                        upd.executeUpdate();
+                    String formattedLDT = LocalDateTime.now()
+                            .format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+
+                    String updateSql = "UPDATE tbl_customerDetails SET dateTimeIn = ? WHERE customerID = ?";
+                    try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                        updateStmt.setString(1, formattedLDT);
+                        updateStmt.setInt(2, loginID);
+                        updateStmt.executeUpdate();
                     }
+
                     LOGGER.info("Customer " + loginID + " logged in successfully");
-                    return loginID;
+                    return rs.getInt("customerID");
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "findCustomerByID failed", e);
+            LOGGER.log(Level.SEVERE, "Error finding customer: " + e.getMessage(), e);
         }
         return -1;
     }
@@ -389,81 +385,81 @@ public class Repository {
             forgotContactNumber == null || forgotContactNumber.trim().isEmpty()) {
             return -1;
         }
-        String sql = "SELECT customerID FROM customers WHERE LOWER(customerFullName) = LOWER(?) AND customerContactNumber = ? AND accountStatus = 'ACTIVE'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, forgotFullName.trim());
-            ps.setString(2, forgotContactNumber.trim());
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("customerID");
+
+        String sql = "SELECT customerID FROM tbl_customerDetails WHERE LOWER(customerFullName) = LOWER(?) AND customerContactNumber = ? AND accountStatus = 'ACTIVE'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, forgotFullName.trim());
+            pstmt.setString(2, forgotContactNumber.trim());
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("customerID");
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "findCustomerByDetails failed", e);
+            LOGGER.log(Level.SEVERE, "Error finding customer by details: " + e.getMessage(), e);
         }
         return -1;
     }
 
     public boolean trackLogOut(int loginID) {
         String formattedLDT = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
-        String sql = "UPDATE customers SET dateTimeOut = ? WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, formattedLDT);
-            ps.setInt(2, loginID);
-            int rows = ps.executeUpdate();
-            if (rows > 0) {
+        String updateSql = "UPDATE tbl_customerDetails SET dateTimeOut = ? WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+
+            pstmt.setString(1, formattedLDT);
+            pstmt.setInt(2, loginID);
+            int updated = pstmt.executeUpdate();
+
+            if (updated > 0) {
                 LOGGER.info("Customer " + loginID + " logged out successfully");
                 return true;
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "trackLogOut failed", e);
+            LOGGER.log(Level.SEVERE, "Error tracking logout: " + e.getMessage(), e);
         }
         return false;
     }
 
     public String getCustomerName(int customerID) {
-        String sql = "SELECT customerFullName FROM customers WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getString("customerFullName");
+        String sql = "SELECT customerFullName FROM tbl_customerDetails WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("customerFullName");
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCustomerName failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting customer name: " + e.getMessage(), e);
         }
         return "Unknown";
     }
 
     public int getCustomerAge(int customerID) {
-        String sql = "SELECT customerAge FROM customers WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("customerAge");
+        String sql = "SELECT customerAge FROM tbl_customerDetails WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("customerAge");
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCustomerAge failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting customer age: " + e.getMessage(), e);
         }
         return 0;
-    }
-
-    public String[][] getAllCustomers() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT customerID, customerFullName, customerContactNumber, customerAge, accountDateCreated, dateTimeIn, dateTimeOut FROM customers";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                result.add(new String[]{
-                    String.valueOf(rs.getInt("customerID")),
-                    rs.getString("customerFullName"),
-                    rs.getString("customerContactNumber"),
-                    String.valueOf(rs.getInt("customerAge")),
-                    rs.getString("accountDateCreated"),
-                    rs.getString("dateTimeIn"),
-                    rs.getString("dateTimeOut")
-                });
-            }
-        } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAllCustomers failed", e);
-        }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
     }
 
     // ============ MEMBERSHIP METHODS ============
@@ -473,56 +469,72 @@ public class Repository {
             LOGGER.warning("Invalid membership type: " + membershipType);
             return false;
         }
-        String sql = "UPDATE customers SET membershipType = ?, freebiesCount = ? WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, membershipType);
-            ps.setInt(2, "VIP".equals(membershipType) ? 1 : 0);
-            ps.setInt(3, customerID);
-            return ps.executeUpdate() > 0;
+
+        String sql = "UPDATE tbl_customerRecords SET membershipType = ?, freebiesCount = ? WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, membershipType);
+            pstmt.setInt(2, "VIP".equals(membershipType) ? 1 : 0);
+            pstmt.setInt(3, customerID);
+
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "updateMembershipType failed", e);
+            LOGGER.log(Level.SEVERE, "Error updating membership: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String getMembershipType(int customerID) {
-        String sql = "SELECT membershipType FROM customers WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT membershipType FROM tbl_customerRecords WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    String mt = rs.getString("membershipType");
-                    return mt != null ? mt : "Regular";
+                    String type = rs.getString("membershipType");
+                    return type != null ? type : "Regular";
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getMembershipType failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting membership type: " + e.getMessage(), e);
         }
         return "Regular";
     }
 
     public int getFreebiesCount(int customerID) {
-        String sql = "SELECT freebiesCount FROM customers WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("freebiesCount");
+        String sql = "SELECT freebiesCount FROM tbl_customerRecords WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("freebiesCount");
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getFreebiesCount failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting freebies count: " + e.getMessage(), e);
         }
         return 0;
     }
 
     public boolean useFreebies(int customerID) {
-        String sql = "UPDATE customers SET freebiesCount = freebiesCount - 1 WHERE customerID = ? AND freebiesCount > 0";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_customerRecords SET freebiesCount = CASE WHEN freebiesCount > 0 THEN freebiesCount - 1 ELSE 0 END WHERE customerID = ? AND freebiesCount > 0";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "useFreebies failed", e);
+            LOGGER.log(Level.SEVERE, "Error using freebies: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ POINTS METHODS ============
@@ -532,26 +544,35 @@ public class Repository {
             LOGGER.warning("Cannot add negative points");
             return false;
         }
-        String sql = "UPDATE customers SET customerPoints = customerPoints + ? WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, totalPoints);
-            ps.setInt(2, customerID);
-            return ps.executeUpdate() > 0;
+
+        String sql = "UPDATE tbl_customerRecords SET customerPoints = COALESCE(customerPoints, 0) + ? WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, totalPoints);
+            pstmt.setInt(2, customerID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "loyaltyPoints failed", e);
+            LOGGER.log(Level.SEVERE, "Error adding loyalty points: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public int getPoints(int customerID) {
-        String sql = "SELECT customerPoints FROM customers WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("customerPoints");
+        String sql = "SELECT customerPoints FROM tbl_customerRecords WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("customerPoints");
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getPoints failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting points: " + e.getMessage(), e);
         }
         return 0;
     }
@@ -561,16 +582,27 @@ public class Repository {
             LOGGER.warning("Cannot deduct negative points");
             return false;
         }
-        String sql = "UPDATE customers SET customerPoints = customerPoints - ? WHERE customerID = ? AND customerPoints >= ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, points);
-            ps.setInt(2, customerID);
-            ps.setInt(3, points);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "deductPoints failed", e);
+
+        // Pre-check: ensure customer has enough points
+        int currentPoints = getPoints(customerID);
+        if (currentPoints < points) {
+            LOGGER.warning("Insufficient points for customer " + customerID + ": " + currentPoints + " < " + points);
+            return false;
         }
-        return false;
+
+        String sql = "UPDATE tbl_customerRecords SET customerPoints = customerPoints - ? WHERE customerID = ? AND customerPoints >= ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, points);
+            pstmt.setInt(2, customerID);
+            pstmt.setInt(3, points);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error deducting points: " + e.getMessage(), e);
+            return false;
+        }
     }
 
     // ============ TICKET METHODS ============
@@ -580,57 +612,66 @@ public class Repository {
             LOGGER.warning("Invalid ticket data");
             return false;
         }
-        String sql = "INSERT INTO ticketRecords (ticketID, customerID, dateBought, ticketAge, ticketName, ticketType, ticketPrice) VALUES (?,?,?,?,?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextTicketID++);
-            ps.setInt(2, customerID);
-            ps.setString(3, LocalDate.now().toString());
-            ps.setInt(4, ticketAge);
-            ps.setString(5, ticketName.trim());
-            ps.setString(6, ticketType);
-            ps.setDouble(7, ticketPrice);
-            ps.executeUpdate();
+
+        String sql = "INSERT INTO tbl_ticketRecords (customerID, dateBought, ticketAge, ticketName, ticketType, ticketPrice) VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            pstmt.setString(2, LocalDate.now().toString());
+            pstmt.setInt(3, ticketAge);
+            pstmt.setString(4, ticketName.trim());
+            pstmt.setString(5, ticketType);
+            pstmt.setDouble(6, ticketPrice);
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "saveTicketRecord failed", e);
+            LOGGER.log(Level.SEVERE, "Error saving ticket record: " + e.getMessage(), e);
             return false;
         }
     }
 
     public boolean updateTicketSummary(int customerID, double price) {
-        String sql = "UPDATE customers SET ticketBought = ticketBought + 1, totalCost = totalCost + ? WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDouble(1, price);
-            ps.setInt(2, customerID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_customerRecords SET ticketBought = COALESCE(ticketBought, 0) + 1, totalCost = COALESCE(totalCost, 0) + ? WHERE customerID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setDouble(1, price);
+            pstmt.setInt(2, customerID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "updateTicketSummary failed", e);
+            LOGGER.log(Level.SEVERE, "Error updating ticket summary: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getTransactions(int customerID) {
+        String sql = "SELECT dateBought, ticketName, ticketAge, appointmentDate, paymentStatus, ticketPrice FROM tbl_ticketRecords WHERE customerID = ? ORDER BY dateBought DESC";
+
         List<String[]> transactions = new ArrayList<>();
-        String sql = "SELECT dateBought, ticketName, ticketAge, appointmentDate, paymentStatus, ticketPrice FROM ticketRecords WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    String appt = rs.getString("appointmentDate");
-                    String pay = rs.getString("paymentStatus");
                     transactions.add(new String[]{
                         rs.getString("dateBought"),
                         rs.getString("ticketName"),
                         String.valueOf(rs.getInt("ticketAge")),
-                        appt != null ? appt : "N/A",
-                        pay != null ? pay : "PENDING",
+                        rs.getString("appointmentDate"),
+                        rs.getString("paymentStatus"),
                         String.format("%.2f", rs.getDouble("ticketPrice"))
                     });
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getTransactions failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting transactions: " + e.getMessage(), e);
         }
+
         return transactions.isEmpty() ? null : transactions.toArray(new String[0][]);
     }
 
@@ -638,64 +679,88 @@ public class Repository {
 
     public int getQueuePosition(String membership) {
         if ("VIP".equalsIgnoreCase(membership)) return 0;
-        String sql = "SELECT COUNT(*) FROM queue WHERE membershipType = 'REGULAR' AND status = 'WAITING'";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) return rs.getInt(1) + 1;
+
+        String sql = "SELECT COUNT(*) as count FROM tbl_queue WHERE membershipType = 'REGULAR' AND status = 'WAITING'";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            if (rs.next()) return rs.getInt("count") + 1;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getQueuePosition failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting queue position: " + e.getMessage(), e);
         }
         return 1;
     }
 
     public boolean saveQueueEntry(int customerID, String className, String type, int position, String status) {
+        // First, remove any existing queue entry for this customer
+        String deleteSql = "DELETE FROM tbl_queue WHERE customerID = ? AND status = 'WAITING'";
+        String insertSql = "INSERT INTO tbl_queue (customerID, className, membershipType, queuePosition, status, timestamp) VALUES (?, ?, ?, ?, ?, ?)";
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
         try (Connection conn = getConnection()) {
-            // Remove existing waiting entries for this customer
-            try (PreparedStatement del = conn.prepareStatement("DELETE FROM queue WHERE customerID = ? AND status = 'WAITING'")) {
-                del.setInt(1, customerID);
-                del.executeUpdate();
+            conn.setAutoCommit(false);
+
+            try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql);
+                 PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+
+                deleteStmt.setInt(1, customerID);
+                deleteStmt.executeUpdate();
+
+                insertStmt.setInt(1, customerID);
+                insertStmt.setString(2, className);
+                insertStmt.setString(3, type);
+                insertStmt.setInt(4, position);
+                insertStmt.setString(5, status);
+                insertStmt.setString(6, timestamp);
+                insertStmt.executeUpdate();
+
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            String sql = "INSERT INTO queue (queueID, customerID, className, membershipType, queuePosition, status, timestamp) VALUES (?,?,?,?,?,?,?)";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, nextQueueID++);
-                ps.setInt(2, customerID);
-                ps.setString(3, className);
-                ps.setString(4, type);
-                ps.setInt(5, position);
-                ps.setString(6, status);
-                ps.setString(7, timestamp);
-                ps.executeUpdate();
-            }
-            return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "saveQueueEntry failed", e);
+            LOGGER.log(Level.SEVERE, "Error saving queue entry: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean updateQueueStatus(int customerID, String status) {
-        String sql = "UPDATE queue SET status = ? WHERE customerID = ? AND (status = 'WAITING' OR status = 'READY')";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            ps.setInt(2, customerID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_queue SET status = ? WHERE customerID = ? AND status IN ('WAITING', 'READY')";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, status);
+            pstmt.setInt(2, customerID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "updateQueueStatus failed", e);
+            LOGGER.log(Level.SEVERE, "Error updating queue status: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[] getQueueStatus(int customerID) {
-        String sql = "SELECT className, status, queuePosition FROM queue WHERE customerID = ? ORDER BY queueID DESC LIMIT 1";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT className, status, queuePosition FROM tbl_queue WHERE customerID = ? ORDER BY queueID DESC LIMIT 1";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    return new String[]{rs.getString("className"), rs.getString("status"), String.valueOf(rs.getInt("queuePosition"))};
+                    return new String[]{
+                        rs.getString("className"),
+                        rs.getString("status"),
+                        String.valueOf(rs.getInt("queuePosition"))
+                    };
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getQueueStatus failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting queue status: " + e.getMessage(), e);
         }
         return null;
     }
@@ -703,22 +768,26 @@ public class Repository {
     // ============ APPOINTMENT METHODS ============
 
     public String[][] getAppointments(int customerID) {
+        String sql = "SELECT appointmentDate, paymentStatus FROM tbl_ticketRecords WHERE customerID = ? AND appointmentDate IS NOT NULL ORDER BY appointmentDate";
+
         List<String[]> appointments = new ArrayList<>();
-        String sql = "SELECT appointmentDate, paymentStatus FROM ticketRecords WHERE customerID = ? AND appointmentDate IS NOT NULL";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    String pay = rs.getString("paymentStatus");
                     appointments.add(new String[]{
                         rs.getString("appointmentDate"),
-                        pay != null ? pay : "PENDING"
+                        rs.getString("paymentStatus")
                     });
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAppointments failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting appointments: " + e.getMessage(), e);
         }
+
         return appointments.isEmpty() ? null : appointments.toArray(new String[0][]);
     }
 
@@ -727,51 +796,66 @@ public class Repository {
             LOGGER.warning("Invalid appointment date");
             return false;
         }
-        String sql = "UPDATE ticketRecords SET appointmentDate = ?, paymentStatus = ? WHERE customerID = ? AND appointmentDate IS NULL";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, appointmentDate);
-            ps.setString(2, status);
-            ps.setInt(3, customerID);
-            return ps.executeUpdate() > 0;
+
+        String sql = "UPDATE tbl_ticketRecords SET appointmentDate = ?, paymentStatus = ? WHERE customerID = ? AND appointmentDate IS NULL";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, appointmentDate);
+            pstmt.setString(2, status);
+            pstmt.setInt(3, customerID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "saveAppointmentRecord failed", e);
+            LOGGER.log(Level.SEVERE, "Error saving appointment: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean cancelAppointment(int customerID, String appointmentDate) {
-        String sql = "UPDATE ticketRecords SET paymentStatus = 'CANCELLED' WHERE customerID = ? AND appointmentDate = ? AND paymentStatus != 'CANCELLED'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            ps.setString(2, appointmentDate);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_ticketRecords SET paymentStatus = 'CANCELLED' WHERE customerID = ? AND appointmentDate = ? AND paymentStatus != 'CANCELLED'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            pstmt.setString(2, appointmentDate);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "cancelAppointment failed", e);
+            LOGGER.log(Level.SEVERE, "Error cancelling appointment: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean moveAppointment(int customerID, String oldDate, String newDate) {
-        String sql = "UPDATE ticketRecords SET appointmentDate = ? WHERE customerID = ? AND appointmentDate = ? AND paymentStatus != 'CANCELLED'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, newDate);
-            ps.setInt(2, customerID);
-            ps.setString(3, oldDate);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_ticketRecords SET appointmentDate = ? WHERE customerID = ? AND appointmentDate = ? AND paymentStatus != 'CANCELLED'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, newDate);
+            pstmt.setInt(2, customerID);
+            pstmt.setString(3, oldDate);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "moveAppointment failed", e);
+            LOGGER.log(Level.SEVERE, "Error moving appointment: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ ROOM MANAGEMENT METHODS ============
 
     public String[][] getAllRooms() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight, status FROM rooms";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight, status FROM tbl_rooms ORDER BY roomNumber";
+
+        List<String[]> rooms = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                result.add(new String[]{
+                rooms.add(new String[]{
                     String.valueOf(rs.getInt("roomNumber")),
                     rs.getString("roomType"),
                     String.valueOf(rs.getInt("capacity")),
@@ -780,17 +864,23 @@ public class Repository {
                 });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAllRooms failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting all rooms: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return rooms.isEmpty() ? null : rooms.toArray(new String[0][]);
     }
 
     public String[][] getAvailableRooms() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight FROM rooms WHERE status = 'AVAILABLE'";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight FROM tbl_rooms WHERE status = 'AVAILABLE' ORDER BY roomNumber";
+
+        List<String[]> rooms = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                result.add(new String[]{
+                rooms.add(new String[]{
                     String.valueOf(rs.getInt("roomNumber")),
                     rs.getString("roomType"),
                     String.valueOf(rs.getInt("capacity")),
@@ -798,19 +888,24 @@ public class Repository {
                 });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAvailableRooms failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting available rooms: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return rooms.isEmpty() ? null : rooms.toArray(new String[0][]);
     }
 
     public String[][] getAvailableRoomsByType(String roomType) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight FROM rooms WHERE status = 'AVAILABLE' AND roomType = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, roomType);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight FROM tbl_rooms WHERE status = 'AVAILABLE' AND roomType = ? ORDER BY roomNumber";
+
+        List<String[]> rooms = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, roomType);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    result.add(new String[]{
+                    rooms.add(new String[]{
                         String.valueOf(rs.getInt("roomNumber")),
                         rs.getString("roomType"),
                         String.valueOf(rs.getInt("capacity")),
@@ -819,104 +914,111 @@ public class Repository {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAvailableRoomsByType failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting rooms by type: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return rooms.isEmpty() ? null : rooms.toArray(new String[0][]);
     }
 
     public boolean bookRoom(int roomNumber, int customerID, String checkInDate, String checkOutDate, int guests) {
+        String updateSql = "UPDATE tbl_rooms SET status = 'OCCUPIED', currentGuestID = ?, checkInDate = ?, checkOutDate = ?, guestCount = ? WHERE roomNumber = ? AND status = 'AVAILABLE'";
+        String bookingSql = "INSERT INTO tbl_roomBookings (roomNumber, customerID, checkInDate, checkOutDate, guestCount, bookingStatus) VALUES (?, ?, ?, ?, ?, 'CONFIRMED')";
+
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
-            String checkSql = "SELECT status FROM rooms WHERE roomNumber = ? AND status = 'AVAILABLE'";
-            try (PreparedStatement check = conn.prepareStatement(checkSql)) {
-                check.setInt(1, roomNumber);
-                try (ResultSet rs = check.executeQuery()) {
-                    if (!rs.next()) {
-                        conn.rollback();
-                        return false;
-                    }
+
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                 PreparedStatement bookingStmt = conn.prepareStatement(bookingSql)) {
+
+                updateStmt.setInt(1, customerID);
+                updateStmt.setString(2, checkInDate);
+                updateStmt.setString(3, checkOutDate);
+                updateStmt.setInt(4, guests);
+                updateStmt.setInt(5, roomNumber);
+                int updated = updateStmt.executeUpdate();
+
+                if (updated == 0) {
+                    conn.rollback();
+                    return false;
                 }
+
+                bookingStmt.setInt(1, roomNumber);
+                bookingStmt.setInt(2, customerID);
+                bookingStmt.setString(3, checkInDate);
+                bookingStmt.setString(4, checkOutDate);
+                bookingStmt.setInt(5, guests);
+                bookingStmt.executeUpdate();
+
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            String updRoom = "UPDATE rooms SET status = 'OCCUPIED', currentGuestID = ?, checkInDate = ?, checkOutDate = ?, guestCount = ? WHERE roomNumber = ?";
-            try (PreparedStatement ps = conn.prepareStatement(updRoom)) {
-                ps.setInt(1, customerID);
-                ps.setString(2, checkInDate);
-                ps.setString(3, checkOutDate);
-                ps.setInt(4, guests);
-                ps.setInt(5, roomNumber);
-                ps.executeUpdate();
-            }
-            String bookSql = "INSERT INTO roomBookings (bookingID, roomNumber, customerID, checkInDate, checkOutDate, guestCount, bookingStatus) VALUES (?,?,?,?,?,?,?)";
-            try (PreparedStatement ps = conn.prepareStatement(bookSql)) {
-                ps.setInt(1, nextBookingID++);
-                ps.setInt(2, roomNumber);
-                ps.setInt(3, customerID);
-                ps.setString(4, checkInDate);
-                ps.setString(5, checkOutDate);
-                ps.setInt(6, guests);
-                ps.setString(7, "CONFIRMED");
-                ps.executeUpdate();
-            }
-            conn.commit();
-            return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "bookRoom failed", e);
+            LOGGER.log(Level.SEVERE, "Error booking room: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean checkOutRoom(int roomNumber) {
+        String updateSql = "UPDATE tbl_rooms SET status = 'CLEANING', currentGuestID = NULL, checkInDate = NULL, checkOutDate = NULL, guestCount = 0 WHERE roomNumber = ?";
+        String bookingSql = "UPDATE tbl_roomBookings SET bookingStatus = 'CHECKED_OUT', actualCheckOut = ? WHERE roomNumber = ? AND bookingStatus = 'CONFIRMED'";
+
         try (Connection conn = getConnection()) {
-            conn.setAutoCommit(false);
-            String updRoom = "UPDATE rooms SET status = 'CLEANING', currentGuestID = 0, checkInDate = NULL, checkOutDate = NULL, guestCount = 0 WHERE roomNumber = ?";
-            try (PreparedStatement ps = conn.prepareStatement(updRoom)) {
-                ps.setInt(1, roomNumber);
-                ps.executeUpdate();
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                 PreparedStatement bookingStmt = conn.prepareStatement(bookingSql)) {
+
+                updateStmt.setInt(1, roomNumber);
+                updateStmt.executeUpdate();
+
+                bookingStmt.setString(1, LocalDate.now().toString());
+                bookingStmt.setInt(2, roomNumber);
+                bookingStmt.executeUpdate();
+
+                return true;
             }
-            String updBook = "UPDATE roomBookings SET bookingStatus = 'CHECKED_OUT', actualCheckOut = ? WHERE roomNumber = ? AND bookingStatus = 'CONFIRMED'";
-            try (PreparedStatement ps = conn.prepareStatement(updBook)) {
-                ps.setString(1, LocalDate.now().toString());
-                ps.setInt(2, roomNumber);
-                ps.executeUpdate();
-            }
-            conn.commit();
-            return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "checkOutRoom failed", e);
+            LOGGER.log(Level.SEVERE, "Error checking out room: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean setRoomCleaned(int roomNumber) {
-        String sql = "UPDATE rooms SET status = 'AVAILABLE' WHERE roomNumber = ? AND status = 'CLEANING'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roomNumber);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_rooms SET status = 'AVAILABLE' WHERE roomNumber = ? AND status = 'CLEANING'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "setRoomCleaned failed", e);
+            LOGGER.log(Level.SEVERE, "Error setting room cleaned: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[] getRoomDetails(int roomNumber) {
-        String sql = "SELECT roomNumber, roomType, capacity, pricePerNight, status, currentGuestID FROM rooms WHERE roomNumber = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roomNumber);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_rooms WHERE roomNumber = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    int guestID = rs.getInt("currentGuestID");
                     return new String[]{
                         String.valueOf(rs.getInt("roomNumber")),
                         rs.getString("roomType"),
                         String.valueOf(rs.getInt("capacity")),
                         String.format("%.2f", rs.getDouble("pricePerNight")),
                         rs.getString("status"),
-                        guestID > 0 ? String.valueOf(guestID) : "None"
+                        rs.getString("currentGuestID") != null ? String.valueOf(rs.getInt("currentGuestID")) : "None"
                     };
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getRoomDetails failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting room details: " + e.getMessage(), e);
         }
         return null;
     }
@@ -924,35 +1026,38 @@ public class Repository {
     // ============ HOUSEKEEPING METHODS ============
 
     public boolean assignCleaningTask(int roomNumber, String staffName, String priority) {
-        String sql = "INSERT INTO housekeeping (taskID, roomNumber, staffName, taskDate, priority, status) VALUES (?,?,?,?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextTaskID++);
-            ps.setInt(2, roomNumber);
-            ps.setString(3, staffName);
-            ps.setString(4, LocalDate.now().toString());
-            ps.setString(5, priority);
-            ps.setString(6, "PENDING");
-            ps.executeUpdate();
+        String sql = "INSERT INTO tbl_housekeeping (roomNumber, staffName, taskDate, priority, status) VALUES (?, ?, ?, ?, 'PENDING')";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setString(2, staffName);
+            pstmt.setString(3, LocalDate.now().toString());
+            pstmt.setString(4, priority);
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "assignCleaningTask failed", e);
+            LOGGER.log(Level.SEVERE, "Error assigning cleaning task: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getCleaningTasks(String status) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT taskID, roomNumber, staffName, taskDate, priority FROM housekeeping WHERE status = ? ORDER BY CASE priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT h.*, r.roomType FROM tbl_housekeeping h JOIN tbl_rooms r ON h.roomNumber = r.roomNumber WHERE h.status = ? ORDER BY CASE h.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, h.taskDate";
+
+        List<String[]> tasks = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, status);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    int rn = rs.getInt("roomNumber");
-                    String roomType = getRoomTypeCached(conn, rn);
-                    result.add(new String[]{
+                    tasks.add(new String[]{
                         String.valueOf(rs.getInt("taskID")),
-                        String.valueOf(rn),
-                        roomType,
+                        String.valueOf(rs.getInt("roomNumber")),
+                        rs.getString("roomType"),
                         rs.getString("staffName"),
                         rs.getString("taskDate"),
                         rs.getString("priority")
@@ -960,95 +1065,112 @@ public class Repository {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCleaningTasks failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting cleaning tasks: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
-    }
 
-    private String getRoomTypeCached(Connection conn, int roomNumber) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT roomType FROM rooms WHERE roomNumber = ?")) {
-            ps.setInt(1, roomNumber);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getString("roomType");
-            }
-        }
-        return "Unknown";
+        return tasks.isEmpty() ? null : tasks.toArray(new String[0][]);
     }
 
     public boolean completeCleaningTask(int taskID, String notes) {
-        String sql = "UPDATE housekeeping SET status = 'COMPLETED', completionDate = ?, notes = ? WHERE taskID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, LocalDate.now().toString());
-            ps.setString(2, notes);
-            ps.setInt(3, taskID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_housekeeping SET status = 'COMPLETED', completionDate = ?, notes = ? WHERE taskID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, LocalDate.now().toString());
+            pstmt.setString(2, notes);
+            pstmt.setInt(3, taskID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "completeCleaningTask failed", e);
+            LOGGER.log(Level.SEVERE, "Error completing cleaning task: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ MAINTENANCE METHODS ============
 
     public boolean reportMaintenanceIssue(String facilityName, String issueType, String description, String reportedBy) {
-        return reportMaintenanceIssueWithSeverity(facilityName, issueType, description, reportedBy, "MEDIUM");
+        String sql = "INSERT INTO tbl_maintenance (facilityName, issueType, description, reportedBy, reportDate, status) VALUES (?, ?, ?, ?, ?, 'PENDING')";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, facilityName);
+            pstmt.setString(2, issueType);
+            pstmt.setString(3, description);
+            pstmt.setString(4, reportedBy);
+            pstmt.setString(5, LocalDate.now().toString());
+            pstmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error reporting maintenance issue: " + e.getMessage(), e);
+            return false;
+        }
     }
 
     public boolean reportMaintenanceIssueWithSeverity(String facilityName, String issueType, String description, String reportedBy, String severity) {
-        String sql = "INSERT INTO maintenance (issueID, facilityName, issueType, description, reportedBy, reportDate, status, severity) VALUES (?,?,?,?,?,?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextIssueID++);
-            ps.setString(2, facilityName);
-            ps.setString(3, issueType);
-            ps.setString(4, description);
-            ps.setString(5, reportedBy);
-            ps.setString(6, LocalDate.now().toString());
-            ps.setString(7, "PENDING");
-            ps.setString(8, severity);
-            ps.executeUpdate();
+        String sql = "INSERT INTO tbl_maintenance (facilityName, issueType, description, reportedBy, reportDate, status, severity) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, facilityName);
+            pstmt.setString(2, issueType);
+            pstmt.setString(3, description);
+            pstmt.setString(4, reportedBy);
+            pstmt.setString(5, LocalDate.now().toString());
+            pstmt.setString(6, severity);
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "reportMaintenanceIssueWithSeverity failed", e);
+            LOGGER.log(Level.SEVERE, "Error reporting maintenance issue with severity: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getMaintenanceIssues(String status) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT issueID, facilityName, issueType, description, reportedBy, reportDate, assignedTo, status, severity FROM maintenance WHERE status = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_maintenance WHERE status = ? ORDER BY reportDate";
+
+        List<String[]> issues = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, status);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    String assigned = rs.getString("assignedTo");
-                    result.add(new String[]{
+                    issues.add(new String[]{
                         String.valueOf(rs.getInt("issueID")),
                         rs.getString("facilityName"),
                         rs.getString("issueType"),
                         rs.getString("description"),
                         rs.getString("reportedBy"),
                         rs.getString("reportDate"),
-                        assigned != null ? assigned : "Not Assigned",
+                        rs.getString("assignedTo") != null ? rs.getString("assignedTo") : "Not Assigned",
                         rs.getString("status"),
                         rs.getString("severity")
                     });
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getMaintenanceIssues failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting maintenance issues: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return issues.isEmpty() ? null : issues.toArray(new String[0][]);
     }
 
     public String[][] getMaintenanceBySeverity(String severity) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT issueID, facilityName, issueType, description, severity, reportedBy, reportDate, assignedTo, status FROM maintenance WHERE severity = ? AND status != 'COMPLETED'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, severity);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_maintenance WHERE severity = ? AND status != 'COMPLETED' ORDER BY reportDate";
+
+        List<String[]> issues = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, severity);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    String assigned = rs.getString("assignedTo");
-                    result.add(new String[]{
+                    issues.add(new String[]{
                         String.valueOf(rs.getInt("issueID")),
                         rs.getString("facilityName"),
                         rs.getString("issueType"),
@@ -1056,74 +1178,80 @@ public class Repository {
                         rs.getString("severity"),
                         rs.getString("reportedBy"),
                         rs.getString("reportDate"),
-                        assigned != null ? assigned : "Not Assigned",
+                        rs.getString("assignedTo") != null ? rs.getString("assignedTo") : "Not Assigned",
                         rs.getString("status")
                     });
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getMaintenanceBySeverity failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting maintenance by severity: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return issues.isEmpty() ? null : issues.toArray(new String[0][]);
     }
 
     public boolean assignMaintenance(int issueID, String assignedTo) {
-        String sql = "UPDATE maintenance SET assignedTo = ?, status = 'IN_PROGRESS' WHERE issueID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, assignedTo);
-            ps.setInt(2, issueID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_maintenance SET assignedTo = ?, status = 'IN_PROGRESS' WHERE issueID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, assignedTo);
+            pstmt.setInt(2, issueID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "assignMaintenance failed", e);
+            LOGGER.log(Level.SEVERE, "Error assigning maintenance: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean completeMaintenance(int issueID, String resolution) {
-        String sql = "UPDATE maintenance SET status = 'COMPLETED', resolution = ?, completionDate = ? WHERE issueID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, resolution);
-            ps.setString(2, LocalDate.now().toString());
-            ps.setInt(3, issueID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_maintenance SET status = 'COMPLETED', resolution = ?, completionDate = ? WHERE issueID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, resolution);
+            pstmt.setString(2, LocalDate.now().toString());
+            pstmt.setInt(3, issueID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "completeMaintenance failed", e);
+            LOGGER.log(Level.SEVERE, "Error completing maintenance: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ FACILITY METHODS ============
 
     public boolean addFacility(String facilityName, String facilityType, String location, String operatingHours) {
-        String checkSql = "SELECT 1 FROM facilities WHERE facilityName = ?";
-        try (Connection conn = getConnection(); PreparedStatement check = conn.prepareStatement(checkSql)) {
-            check.setString(1, facilityName);
-            try (ResultSet rs = check.executeQuery()) {
-                if (rs.next()) return false;
-            }
-            String sql = "INSERT INTO facilities (facilityID, facilityName, facilityType, location, operatingHours, status) VALUES (?,?,?,?,?,?)";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, nextFacilityID++);
-                ps.setString(2, facilityName);
-                ps.setString(3, facilityType);
-                ps.setString(4, location);
-                ps.setString(5, operatingHours);
-                ps.setString(6, "OPERATIONAL");
-                ps.executeUpdate();
-                return true;
-            }
+        String sql = "INSERT INTO tbl_facilities (facilityName, facilityType, location, operatingHours, status) VALUES (?, ?, ?, ?, 'OPERATIONAL')";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, facilityName);
+            pstmt.setString(2, facilityType);
+            pstmt.setString(3, location);
+            pstmt.setString(4, operatingHours);
+            pstmt.executeUpdate();
+            return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "addFacility failed", e);
+            LOGGER.log(Level.SEVERE, "Error adding facility: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getAllFacilities() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT facilityID, facilityName, facilityType, location, status FROM facilities";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT * FROM tbl_facilities ORDER BY facilityName";
+
+        List<String[]> facilities = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                result.add(new String[]{
+                facilities.add(new String[]{
                     String.valueOf(rs.getInt("facilityID")),
                     rs.getString("facilityName"),
                     rs.getString("facilityType"),
@@ -1132,143 +1260,173 @@ public class Repository {
                 });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAllFacilities failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting all facilities: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return facilities.isEmpty() ? null : facilities.toArray(new String[0][]);
     }
 
     public boolean updateFacilityStatus(int facilityID, String status) {
-        String sql = "UPDATE facilities SET status = ? WHERE facilityID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            ps.setInt(2, facilityID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_facilities SET status = ? WHERE facilityID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, status);
+            pstmt.setInt(2, facilityID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "updateFacilityStatus failed", e);
+            LOGGER.log(Level.SEVERE, "Error updating facility status: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ PREDICTIVE MAINTENANCE METHODS ============
 
     public boolean logFacilityUsage(int facilityID) {
-        String sql = "UPDATE facilities SET totalCycles = totalCycles + 1 WHERE facilityID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, facilityID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_facilities SET totalCycles = COALESCE(totalCycles, 0) + 1 WHERE facilityID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, facilityID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "logFacilityUsage failed", e);
+            LOGGER.log(Level.SEVERE, "Error logging facility usage: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public int getTotalCycles(int facilityID) {
-        String sql = "SELECT totalCycles FROM facilities WHERE facilityID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, facilityID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT totalCycles FROM tbl_facilities WHERE facilityID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, facilityID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) return rs.getInt("totalCycles");
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getTotalCycles failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting total cycles: " + e.getMessage(), e);
         }
         return 0;
     }
 
     public int getCycleThreshold(int facilityID) {
-        String sql = "SELECT cycleThreshold FROM facilities WHERE facilityID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, facilityID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT cycleThreshold FROM tbl_facilities WHERE facilityID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, facilityID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) return rs.getInt("cycleThreshold");
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCycleThreshold failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting cycle threshold: " + e.getMessage(), e);
         }
         return 1000;
     }
 
     public boolean schedulePredictiveMaintenance(int facilityID) {
+        String sql = "UPDATE tbl_facilities SET nextScheduledMaintenance = ?, status = 'SCHEDULED_MAINTENANCE' WHERE facilityID = ?";
         String nextDate = LocalDate.now().plusDays(7).toString();
-        String sql = "UPDATE facilities SET nextScheduledMaintenance = ?, status = 'MAINTENANCE' WHERE facilityID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nextDate);
-            ps.setInt(2, facilityID);
-            return ps.executeUpdate() > 0;
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, nextDate);
+            pstmt.setInt(2, facilityID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "schedulePredictiveMaintenance failed", e);
+            LOGGER.log(Level.SEVERE, "Error scheduling maintenance: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getFacilitiesNeedingMaintenance() {
-        List<String[]> result = new ArrayList<>();
-        String today = LocalDate.now().toString();
-        String sql = "SELECT facilityID, facilityName, totalCycles, cycleThreshold, nextScheduledMaintenance FROM facilities";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                int cycles = rs.getInt("totalCycles");
-                int threshold = rs.getInt("cycleThreshold");
-                String nextMaint = rs.getString("nextScheduledMaintenance");
-                boolean needsMaint = cycles >= threshold;
-                if (nextMaint != null && nextMaint.compareTo(today) <= 0) {
-                    needsMaint = true;
-                }
-                if (needsMaint) {
-                    result.add(new String[]{
+        String sql = "SELECT facilityID, facilityName, totalCycles, cycleThreshold, nextScheduledMaintenance FROM tbl_facilities WHERE totalCycles >= cycleThreshold OR (nextScheduledMaintenance <= ? AND nextScheduledMaintenance IS NOT NULL)";
+
+        List<String[]> facilities = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, LocalDate.now().toString());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    facilities.add(new String[]{
                         String.valueOf(rs.getInt("facilityID")),
                         rs.getString("facilityName"),
-                        String.valueOf(cycles),
-                        String.valueOf(threshold),
-                        nextMaint
+                        String.valueOf(rs.getInt("totalCycles")),
+                        String.valueOf(rs.getInt("cycleThreshold")),
+                        rs.getString("nextScheduledMaintenance")
                     });
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getFacilitiesNeedingMaintenance failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting facilities needing maintenance: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return facilities.isEmpty() ? null : facilities.toArray(new String[0][]);
     }
 
     // ============ CUSTOMER ROOM BOOKING METHODS ============
 
     public boolean cancelRoomBooking(int customerID, int roomNumber, String checkInDate) {
+        // Update room status back to AVAILABLE
+        String updateRoomSql = "UPDATE tbl_rooms SET status = 'AVAILABLE', currentGuestID = NULL, checkInDate = NULL, checkOutDate = NULL, guestCount = 0 WHERE roomNumber = ? AND currentGuestID = ?";
+        // Update booking status to CANCELLED
+        String updateBookingSql = "UPDATE tbl_roomBookings SET bookingStatus = 'CANCELLED' WHERE customerID = ? AND roomNumber = ? AND checkInDate = ? AND bookingStatus = 'CONFIRMED'";
+
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
-            String updRoom = "UPDATE rooms SET status = 'AVAILABLE', currentGuestID = 0, checkInDate = NULL, checkOutDate = NULL, guestCount = 0 WHERE roomNumber = ? AND currentGuestID = ?";
-            try (PreparedStatement ps = conn.prepareStatement(updRoom)) {
-                ps.setInt(1, roomNumber);
-                ps.setInt(2, customerID);
-                ps.executeUpdate();
-            }
-            String updBook = "UPDATE roomBookings SET bookingStatus = 'CANCELLED' WHERE customerID = ? AND roomNumber = ? AND checkInDate = ? AND bookingStatus = 'CONFIRMED'";
-            try (PreparedStatement ps = conn.prepareStatement(updBook)) {
-                ps.setInt(1, customerID);
-                ps.setInt(2, roomNumber);
-                ps.setString(3, checkInDate);
-                int rows = ps.executeUpdate();
-                conn.commit();
-                return rows > 0;
+
+            try (PreparedStatement roomStmt = conn.prepareStatement(updateRoomSql);
+                 PreparedStatement bookingStmt = conn.prepareStatement(updateBookingSql)) {
+
+                roomStmt.setInt(1, roomNumber);
+                roomStmt.setInt(2, customerID);
+                roomStmt.executeUpdate();
+
+                bookingStmt.setInt(1, customerID);
+                bookingStmt.setInt(2, roomNumber);
+                bookingStmt.setString(3, checkInDate);
+                int updated = bookingStmt.executeUpdate();
+
+                if (updated > 0) {
+                    conn.commit();
+                    return true;
+                } else {
+                    conn.rollback();
+                    return false;
+                }
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "cancelRoomBooking failed", e);
+            LOGGER.log(Level.SEVERE, "Error cancelling room booking: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getCustomerBookings(int customerID) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT bookingID, roomNumber, checkInDate, checkOutDate, guestCount, bookingStatus FROM roomBookings WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT b.*, r.roomType FROM tbl_roomBookings b JOIN tbl_rooms r ON b.roomNumber = r.roomNumber WHERE b.customerID = ? ORDER BY b.checkInDate";
+
+        List<String[]> bookings = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    int rn = rs.getInt("roomNumber");
-                    String roomType = getRoomTypeCached(conn, rn);
-                    result.add(new String[]{
+                    bookings.add(new String[]{
                         String.valueOf(rs.getInt("bookingID")),
-                        String.valueOf(rn),
-                        roomType,
+                        String.valueOf(rs.getInt("roomNumber")),
+                        rs.getString("roomType"),
                         rs.getString("checkInDate"),
                         rs.getString("checkOutDate"),
                         rs.getString("bookingStatus")
@@ -1276,67 +1434,83 @@ public class Repository {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCustomerBookings failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting customer bookings: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return bookings.isEmpty() ? null : bookings.toArray(new String[0][]);
     }
 
     // ============ SMART ROOM ASSIGNMENT METHODS ============
 
     public int[] getGuestRoomHistory(int customerID) {
+        String sql = "SELECT DISTINCT roomNumber FROM tbl_roomBookings WHERE customerID = ? ORDER BY checkInDate DESC LIMIT 5";
+
         List<Integer> rooms = new ArrayList<>();
-        String sql = "SELECT DISTINCT roomNumber FROM roomBookings WHERE customerID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     rooms.add(rs.getInt("roomNumber"));
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getGuestRoomHistory failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting guest room history: " + e.getMessage(), e);
         }
+
         return rooms.stream().mapToInt(Integer::intValue).toArray();
     }
 
     public int getTotalRoomBookings() {
-        String sql = "SELECT COUNT(*) FROM roomBookings";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT COUNT(*) FROM tbl_roomBookings";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             if (rs.next()) return rs.getInt(1);
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getTotalRoomBookings failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting total room bookings: " + e.getMessage(), e);
         }
         return 0;
     }
 
     public String[][] getTopRoomTypes() {
-        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
-        String sql = "SELECT roomNumber FROM roomBookings";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT r.roomType, COUNT(*) as count FROM tbl_roomBookings b JOIN tbl_rooms r ON b.roomNumber = r.roomNumber GROUP BY r.roomType ORDER BY count DESC";
+
+        List<String[]> types = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                int rn = rs.getInt("roomNumber");
-                String roomType = getRoomTypeCached(conn, rn);
-                counts.put(roomType, counts.getOrDefault(roomType, 0) + 1);
+                types.add(new String[]{
+                    rs.getString("roomType"),
+                    String.valueOf(rs.getInt("count"))
+                });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getTopRoomTypes failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting top room types: " + e.getMessage(), e);
         }
-        List<String[]> result = new ArrayList<>();
-        counts.entrySet().stream()
-            .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
-            .forEach(e -> result.add(new String[]{e.getKey(), String.valueOf(e.getValue())}));
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return types.isEmpty() ? null : types.toArray(new String[0][]);
     }
 
     public int getCurrentGuestRoom(int customerID) {
-        String sql = "SELECT roomNumber FROM rooms WHERE currentGuestID = ? AND status = 'OCCUPIED'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT roomNumber FROM tbl_rooms WHERE currentGuestID = ? AND status = 'OCCUPIED'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) return rs.getInt("roomNumber");
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getCurrentGuestRoom failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting current guest room: " + e.getMessage(), e);
         }
         return -1;
     }
@@ -1344,204 +1518,174 @@ public class Repository {
     // ============ ROOM CONTROL SYSTEM (IoT) METHODS ============
 
     public boolean updateRoomTemperature(int roomNumber, double temperature) {
-        double clamped = Math.max(16, Math.min(30, temperature));
-        String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus) VALUES (?,?,?,1,0) "
-                + "ON CONFLICT(roomNumber) DO UPDATE SET temperature = excluded.temperature";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextStatusID++);
-            ps.setInt(2, roomNumber);
-            ps.setDouble(3, clamped);
-            ps.executeUpdate();
+        // Using INSERT with ON CONFLICT (UPSERT pattern for SQLite)
+        String sql = "INSERT INTO tbl_roomStatus (roomNumber, temperature) VALUES (?, ?) ON CONFLICT(roomNumber) DO UPDATE SET temperature = excluded.temperature";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setDouble(2, Math.max(16, Math.min(30, temperature))); // Clamp between 16-30
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            // Fallback for older SQLite without ON CONFLICT
-            return updateRoomStatusFallback(roomNumber, clamped, null, null);
+            LOGGER.log(Level.SEVERE, "Error updating room temperature: " + e.getMessage(), e);
+            return false;
         }
     }
 
     public boolean updateRoomLights(int roomNumber, boolean lightsOn) {
-        String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus) VALUES (?,?,22.0,?,0) "
-                + "ON CONFLICT(roomNumber) DO UPDATE SET lightsOn = excluded.lightsOn";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextStatusID++);
-            ps.setInt(2, roomNumber);
-            ps.setInt(3, lightsOn ? 1 : 0);
-            ps.executeUpdate();
+        String sql = "INSERT INTO tbl_roomStatus (roomNumber, lightsOn) VALUES (?, ?) ON CONFLICT(roomNumber) DO UPDATE SET lightsOn = excluded.lightsOn";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setBoolean(2, lightsOn);
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            return updateRoomStatusFallback(roomNumber, null, lightsOn, null);
+            LOGGER.log(Level.SEVERE, "Error updating room lights: " + e.getMessage(), e);
+            return false;
         }
     }
 
     public boolean updateRoomDND(int roomNumber, boolean dndStatus) {
-        String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus) VALUES (?,?,22.0,1,?) "
-                + "ON CONFLICT(roomNumber) DO UPDATE SET dndStatus = excluded.dndStatus";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nextStatusID++);
-            ps.setInt(2, roomNumber);
-            ps.setInt(3, dndStatus ? 1 : 0);
-            ps.executeUpdate();
-            return true;
-        } catch (SQLException e) {
-            return updateRoomStatusFallback(roomNumber, null, null, dndStatus);
-        }
-    }
+        String sql = "INSERT INTO tbl_roomStatus (roomNumber, dndStatus) VALUES (?, ?) ON CONFLICT(roomNumber) DO UPDATE SET dndStatus = excluded.dndStatus";
 
-    private boolean updateRoomStatusFallback(int roomNumber, Double temperature, Boolean lightsOn, Boolean dndStatus) {
-        try (Connection conn = getConnection()) {
-            String check = "SELECT statusID FROM roomStatuses WHERE roomNumber = ?";
-            try (PreparedStatement ps = conn.prepareStatement(check)) {
-                ps.setInt(1, roomNumber);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        StringBuilder sb = new StringBuilder("UPDATE roomStatuses SET ");
-                        if (temperature != null) sb.append("temperature = ?, ");
-                        if (lightsOn != null) sb.append("lightsOn = ?, ");
-                        if (dndStatus != null) sb.append("dndStatus = ?, ");
-                        String sql = sb.toString();
-                        sql = sql.substring(0, sql.length() - 2) + " WHERE roomNumber = ?";
-                        try (PreparedStatement upd = conn.prepareStatement(sql)) {
-                            int idx = 1;
-                            if (temperature != null) upd.setDouble(idx++, temperature);
-                            if (lightsOn != null) upd.setInt(idx++, lightsOn ? 1 : 0);
-                            if (dndStatus != null) upd.setInt(idx++, dndStatus ? 1 : 0);
-                            upd.setInt(idx, roomNumber);
-                            upd.executeUpdate();
-                        }
-                    } else {
-                        String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus) VALUES (?,?,?,?,?)";
-                        try (PreparedStatement ins = conn.prepareStatement(sql)) {
-                            ins.setInt(1, nextStatusID++);
-                            ins.setInt(2, roomNumber);
-                            ins.setDouble(3, temperature != null ? temperature : 22.0);
-                            ins.setInt(4, lightsOn != null && lightsOn ? 1 : 1);
-                            ins.setInt(5, dndStatus != null && dndStatus ? 1 : 0);
-                            ins.executeUpdate();
-                        }
-                    }
-                }
-            }
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setBoolean(2, dndStatus);
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "updateRoomStatusFallback failed", e);
+            LOGGER.log(Level.SEVERE, "Error updating room DND: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public RoomStatus getRoomStatus(int roomNumber) {
-        String sql = "SELECT temperature, lightsOn, dndStatus, lastGuestRequest, requestTime FROM roomStatuses WHERE roomNumber = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roomNumber);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_roomStatus WHERE roomNumber = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    return new RoomStatus(rs.getDouble("temperature"), rs.getInt("lightsOn") == 1,
-                            rs.getInt("dndStatus") == 1, rs.getString("lastGuestRequest"), rs.getString("requestTime"));
+                    return new RoomStatus(
+                            rs.getDouble("temperature"),
+                            rs.getBoolean("lightsOn"),
+                            rs.getBoolean("dndStatus"),
+                            rs.getString("lastGuestRequest"),
+                            rs.getString("requestTime")
+                    );
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getRoomStatus failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting room status: " + e.getMessage(), e);
         }
         return new RoomStatus(22.0, true, false, null, null);
     }
 
     public String[][] getAllRoomStatuses() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT roomNumber, temperature, lightsOn, dndStatus, lastGuestRequest FROM roomStatuses";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT rs.*, r.status as roomStatus FROM tbl_roomStatus rs JOIN tbl_rooms r ON rs.roomNumber = r.roomNumber ORDER BY rs.roomNumber";
+
+        List<String[]> statuses = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                int rn = rs.getInt("roomNumber");
-                String roomStatus = getRoomStatusFromRooms(conn, rn);
-                result.add(new String[]{
-                    String.valueOf(rn),
+                statuses.add(new String[]{
+                    String.valueOf(rs.getInt("roomNumber")),
                     String.valueOf(rs.getDouble("temperature")),
-                    String.valueOf(rs.getInt("lightsOn") == 1),
-                    String.valueOf(rs.getInt("dndStatus") == 1),
+                    String.valueOf(rs.getBoolean("lightsOn")),
+                    String.valueOf(rs.getBoolean("dndStatus")),
                     rs.getString("lastGuestRequest"),
-                    roomStatus
+                    rs.getString("roomStatus")
                 });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getAllRoomStatuses failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting all room statuses: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
-    }
 
-    private String getRoomStatusFromRooms(Connection conn, int roomNumber) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT status FROM rooms WHERE roomNumber = ?")) {
-            ps.setInt(1, roomNumber);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getString("status");
-            }
-        }
-        return "UNKNOWN";
+        return statuses.isEmpty() ? null : statuses.toArray(new String[0][]);
     }
 
     public boolean createGuestHousekeepingRequest(int roomNumber, int customerID, String when, String notes) {
-        try (Connection conn = getConnection()) {
-            String req = "Housekeeping: " + when + " - " + notes;
-            String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus, lastGuestRequest, requestTime) VALUES (?,?,22.0,1,0,?,?) "
-                    + "ON CONFLICT(roomNumber) DO UPDATE SET lastGuestRequest = excluded.lastGuestRequest, requestTime = excluded.requestTime";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, nextStatusID++);
-                ps.setInt(2, roomNumber);
-                ps.setString(3, req);
-                ps.setString(4, LocalDateTime.now().toString());
-                ps.executeUpdate();
-            }
+        String sql = "INSERT INTO tbl_roomStatus (roomNumber, lastGuestRequest, requestTime) VALUES (?, ?, ?) ON CONFLICT(roomNumber) DO UPDATE SET lastGuestRequest = excluded.lastGuestRequest, requestTime = excluded.requestTime";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setString(2, "Housekeeping: " + when + " - " + notes);
+            pstmt.setString(3, LocalDateTime.now().toString());
+            pstmt.executeUpdate();
+
+            // Also create a housekeeping task
             assignCleaningTask(roomNumber, "Guest Request", "MEDIUM");
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "createGuestHousekeepingRequest failed", e);
+            LOGGER.log(Level.SEVERE, "Error creating housekeeping request: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public boolean createTowelRequest(int roomNumber, int customerID, int towelCount) {
-        try (Connection conn = getConnection()) {
-            String req = "Towels: " + towelCount + " requested";
-            String sql = "INSERT INTO roomStatuses (statusID, roomNumber, temperature, lightsOn, dndStatus, lastGuestRequest, requestTime) VALUES (?,?,22.0,1,0,?,?) "
-                    + "ON CONFLICT(roomNumber) DO UPDATE SET lastGuestRequest = excluded.lastGuestRequest, requestTime = excluded.requestTime";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, nextStatusID++);
-                ps.setInt(2, roomNumber);
-                ps.setString(3, req);
-                ps.setString(4, LocalDateTime.now().toString());
-                ps.executeUpdate();
-            }
+        String sql = "INSERT INTO tbl_roomStatus (roomNumber, lastGuestRequest, requestTime) VALUES (?, ?, ?) ON CONFLICT(roomNumber) DO UPDATE SET lastGuestRequest = excluded.lastGuestRequest, requestTime = excluded.requestTime";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setString(2, "Towels: " + towelCount + " requested");
+            pstmt.setString(3, LocalDateTime.now().toString());
+            pstmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "createTowelRequest failed", e);
+            LOGGER.log(Level.SEVERE, "Error creating towel request: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     // ============ LOST & FOUND METHODS ============
 
     public int saveFoundItem(int roomNumber, String dateFound, String category, String description, String foundBy, String storageLocation) {
-        String sql = "INSERT INTO lostFound (itemID, roomNumber, dateFound, itemCategory, itemDescription, foundBy, storageLocation, status) VALUES (?,?,?,?,?,?,?,?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            int itemID = nextItemID++;
-            ps.setInt(1, itemID);
-            ps.setInt(2, roomNumber);
-            ps.setString(3, dateFound);
-            ps.setString(4, category);
-            ps.setString(5, description);
-            ps.setString(6, foundBy);
-            ps.setString(7, storageLocation);
-            ps.setString(8, "FOUND");
-            ps.executeUpdate();
-            return itemID;
+        String sql = "INSERT INTO tbl_lostFound (roomNumber, dateFound, itemCategory, itemDescription, foundBy, storageLocation, status) VALUES (?, ?, ?, ?, ?, ?, 'FOUND')";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setInt(1, roomNumber);
+            pstmt.setString(2, dateFound);
+            pstmt.setString(3, category);
+            pstmt.setString(4, description);
+            pstmt.setString(5, foundBy);
+            pstmt.setString(6, storageLocation);
+            pstmt.executeUpdate();
+
+            try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "saveFoundItem failed", e);
+            LOGGER.log(Level.SEVERE, "Error saving found item: " + e.getMessage(), e);
         }
         return -1;
     }
 
     public String[] getLostItemDetails(int itemID) {
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE itemID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, itemID);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_lostFound WHERE itemID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, itemID);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return new String[]{
                         String.valueOf(rs.getInt("itemID")),
@@ -1555,44 +1699,66 @@ public class Repository {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getLostItemDetails failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting lost item details: " + e.getMessage(), e);
         }
         return null;
     }
 
     public boolean claimItem(int itemID, int customerID, String claimantName) {
-        String sql = "UPDATE lostFound SET status = 'CLAIMED', claimedBy = ?, claimDate = ?, claimantName = ? WHERE itemID = ? AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, customerID);
-            ps.setString(2, LocalDate.now().toString());
-            ps.setString(3, claimantName);
-            ps.setInt(4, itemID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_lostFound SET status = 'CLAIMED', claimedBy = ?, claimDate = ?, claimantName = ? WHERE itemID = ? AND status = 'FOUND'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, customerID);
+            pstmt.setString(2, LocalDate.now().toString());
+            pstmt.setString(3, claimantName);
+            pstmt.setInt(4, itemID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "claimItem failed", e);
+            LOGGER.log(Level.SEVERE, "Error claiming item: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] getUnclaimedItems() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE status = 'FOUND'";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT * FROM tbl_lostFound WHERE status = 'FOUND' ORDER BY dateFound";
+
+        List<String[]> items = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                result.add(extractLostFoundItem(rs));
+                items.add(new String[]{
+                    String.valueOf(rs.getInt("itemID")),
+                    String.valueOf(rs.getInt("roomNumber")),
+                    rs.getString("itemCategory"),
+                    rs.getString("itemDescription"),
+                    rs.getString("dateFound"),
+                    rs.getString("status"),
+                    rs.getString("storageLocation")
+                });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getUnclaimedItems failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting unclaimed items: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return items.isEmpty() ? null : items.toArray(new String[0][]);
     }
 
     public String[][] getClaimedItems() {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, itemCategory, itemDescription, claimedBy, claimDate FROM lostFound WHERE status = 'CLAIMED'";
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT itemID, itemCategory, itemDescription, claimedBy, claimDate, claimantName FROM tbl_lostFound WHERE status = 'CLAIMED' ORDER BY claimDate DESC";
+
+        List<String[]> items = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) {
-                result.add(new String[]{
+                items.add(new String[]{
                     String.valueOf(rs.getInt("itemID")),
                     rs.getString("itemCategory"),
                     rs.getString("itemDescription"),
@@ -1601,20 +1767,24 @@ public class Repository {
                 });
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getClaimedItems failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting claimed items: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return items.isEmpty() ? null : items.toArray(new String[0][]);
     }
 
     public String[][] getItemsForDisposal() {
-        List<String[]> result = new ArrayList<>();
-        String cutoff = LocalDate.now().minusDays(30).toString();
-        String sql = "SELECT itemID, itemCategory, itemDescription, dateFound FROM lostFound WHERE status = 'FOUND' AND dateFound <= ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, cutoff);
-            try (ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT * FROM tbl_lostFound WHERE status = 'FOUND' AND dateFound <= ?";
+
+        List<String[]> items = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, LocalDate.now().minusDays(30).toString());
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    result.add(new String[]{
+                    items.add(new String[]{
                         String.valueOf(rs.getInt("itemID")),
                         rs.getString("itemCategory"),
                         rs.getString("itemDescription"),
@@ -1623,121 +1793,148 @@ public class Repository {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "getItemsForDisposal failed", e);
+            LOGGER.log(Level.SEVERE, "Error getting items for disposal: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+
+        return items.isEmpty() ? null : items.toArray(new String[0][]);
     }
 
     public boolean markItemDisposed(int itemID, String reason) {
-        String sql = "UPDATE lostFound SET status = 'DISPOSED', disposalReason = ?, disposalDate = ? WHERE itemID = ?";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, reason);
-            ps.setString(2, LocalDate.now().toString());
-            ps.setInt(3, itemID);
-            return ps.executeUpdate() > 0;
+        String sql = "UPDATE tbl_lostFound SET status = 'DISPOSED', disposalReason = ?, disposalDate = ? WHERE itemID = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, reason);
+            pstmt.setString(2, LocalDate.now().toString());
+            pstmt.setInt(3, itemID);
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "markItemDisposed failed", e);
+            LOGGER.log(Level.SEVERE, "Error marking item disposed: " + e.getMessage(), e);
+            return false;
         }
-        return false;
     }
 
     public String[][] searchLostItemsByRoom(int roomNumber) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE roomNumber = ? AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roomNumber);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(extractLostFoundItem(rs));
-            }
-        } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "searchLostItemsByRoom failed", e);
-        }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+        String sql = "SELECT * FROM tbl_lostFound WHERE roomNumber = ? AND status = 'FOUND'";
+        return executeLostFoundSearch(sql, roomNumber);
     }
 
     public String[][] searchLostItemsByDate(String fromDate, String toDate) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE dateFound >= ? AND dateFound <= ? AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, fromDate);
-            ps.setString(2, toDate);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(extractLostFoundItem(rs));
+        String sql = "SELECT * FROM tbl_lostFound WHERE dateFound BETWEEN ? AND ? AND status = 'FOUND'";
+
+        List<String[]> items = new ArrayList<>();
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, fromDate);
+            pstmt.setString(2, toDate);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return extractLostFoundResults(rs);
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "searchLostItemsByDate failed", e);
+            LOGGER.log(Level.SEVERE, "Error searching lost items by date: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+        return null;
     }
 
     public String[][] searchLostItemsByCategory(String category) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE itemCategory = ? AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, category);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(extractLostFoundItem(rs));
+        String sql = "SELECT * FROM tbl_lostFound WHERE itemCategory = ? AND status = 'FOUND'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, category);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return extractLostFoundResults(rs);
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "searchLostItemsByCategory failed", e);
+            LOGGER.log(Level.SEVERE, "Error searching lost items by category: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+        return null;
     }
 
     public String[][] searchLostItemsByKeyword(String keyword) {
-        List<String[]> result = new ArrayList<>();
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE LOWER(itemDescription) LIKE ? AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, "%" + keyword.toLowerCase() + "%");
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(extractLostFoundItem(rs));
+        String sql = "SELECT * FROM tbl_lostFound WHERE itemDescription LIKE ? AND status = 'FOUND'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, "%" + keyword + "%");
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return extractLostFoundResults(rs);
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "searchLostItemsByKeyword failed", e);
+            LOGGER.log(Level.SEVERE, "Error searching lost items by keyword: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+        return null;
     }
 
     public String[][] searchLostItemsByRooms(int[] roomNumbers) {
         if (roomNumbers == null || roomNumbers.length == 0) return null;
-        List<String[]> result = new ArrayList<>();
-        StringBuilder inClause = new StringBuilder("?");
-        for (int i = 1; i < roomNumbers.length; i++) inClause.append(",?");
-        String sql = "SELECT itemID, roomNumber, itemCategory, itemDescription, dateFound, status, storageLocation FROM lostFound WHERE roomNumber IN (" + inClause + ") AND status = 'FOUND'";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < roomNumbers.length; i++) ps.setInt(i + 1, roomNumbers[i]);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(extractLostFoundItem(rs));
+
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < roomNumbers.length; i++) {
+            if (i > 0) placeholders.append(",");
+            placeholders.append("?");
+        }
+
+        String sql = "SELECT * FROM tbl_lostFound WHERE roomNumber IN (" + placeholders + ") AND status = 'FOUND'";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            for (int i = 0; i < roomNumbers.length; i++) {
+                pstmt.setInt(i + 1, roomNumbers[i]);
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return extractLostFoundResults(rs);
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "searchLostItemsByRooms failed", e);
+            LOGGER.log(Level.SEVERE, "Error searching lost items by rooms: " + e.getMessage(), e);
         }
-        return result.isEmpty() ? null : result.toArray(new String[0][]);
+        return null;
     }
 
-    private String[] extractLostFoundItem(ResultSet rs) throws SQLException {
-        return new String[]{
-            String.valueOf(rs.getInt("itemID")),
-            String.valueOf(rs.getInt("roomNumber")),
-            rs.getString("itemCategory"),
-            rs.getString("itemDescription"),
-            rs.getString("dateFound"),
-            rs.getString("status"),
-            rs.getString("storageLocation")
-        };
+    private String[][] executeLostFoundSearch(String sql, int param) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, param);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return extractLostFoundResults(rs);
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error executing lost found search: " + e.getMessage(), e);
+        }
+        return null;
     }
 
-    // ============ HELPER METHODS ============
+    private String[][] extractLostFoundResults(ResultSet rs) throws SQLException {
+        List<String[]> items = new ArrayList<>();
 
-    private int indexOf(String[] arr, String val) {
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i].equals(val)) return i;
+        while (rs.next()) {
+            items.add(new String[]{
+                String.valueOf(rs.getInt("itemID")),
+                String.valueOf(rs.getInt("roomNumber")),
+                rs.getString("itemCategory"),
+                rs.getString("itemDescription"),
+                rs.getString("dateFound"),
+                rs.getString("status"),
+                rs.getString("storageLocation")
+            });
         }
-        return arr.length;
+
+        return items.isEmpty() ? null : items.toArray(new String[0][]);
     }
 
     // ============ DATA CLASSES ============
 
+    /**
+     * RoomStatus - Plain data class for room IoT status
+     * Independent of any UI/controller class - pure data transfer object
+     */
     public static class RoomStatus {
         public final double temperature;
         public final boolean lightsOn;
@@ -1752,6 +1949,24 @@ public class Repository {
             this.dndStatus = dndStatus;
             this.lastRequest = lastRequest;
             this.requestTime = requestTime;
+        }
+    }
+
+    // ============ BUILDER CLASS ============
+
+    public static class RepositoryBuilder {
+        private String path;
+
+        public RepositoryBuilder setDatabasePath() {
+            // Use relative path for cross-platform compatibility
+            String userHome = System.getProperty("user.home");
+            this.path = "jdbc:sqlite:" + userHome + "/theme_park_resort.db";
+            return this;
+        }
+
+        public Repository build() {
+            if (path == null) throw new IllegalStateException("Database path not set!");
+            return new Repository(path);
         }
     }
 }
