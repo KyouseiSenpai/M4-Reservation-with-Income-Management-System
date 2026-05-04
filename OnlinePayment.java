@@ -3,9 +3,6 @@ import java.util.Scanner;
 /**
  * OnlinePayment - Single unified class for all digital wallet payments
  * Covers GCash, PayMaya, GrabPay, and other online payment methods
- * No separate classes needed - one class handles all
- * 
- * OOP: Inherits PaymentFramework, implements abstract methods
  */
 public class OnlinePayment extends PaymentFramework {
 
