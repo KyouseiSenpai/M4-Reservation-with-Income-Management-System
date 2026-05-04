@@ -1,16 +1,7 @@
 import java.util.Scanner;
 
-/**
- * Visitor Login Class - Handles customer login and ID recovery
- * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation for all inputs
- * - Fixed recursive call issue in forgotCustomerID
- * - Added proper error handling
- * - Fixed age 0 bypass issue in registration call
- * - Added login attempt limiting
- */
+ // Visitor Login Class - Handles customer login and ID recovery
+
 public class visitorLogIn {
 
     private static final Repository repo = Repository.getInstance();
@@ -18,10 +9,6 @@ public class visitorLogIn {
     private static final int MIN_CUSTOMER_ID = 10000;
     private static final int MAX_CUSTOMER_ID = 99999;
 
-    /**
-     * Main login method
-     * @param sc Scanner instance for input
-     */
     public static void login(Scanner sc) {
         int loginChoice;
         boolean inLoginMenu = true;
@@ -51,12 +38,10 @@ public class visitorLogIn {
         } while (inLoginMenu);
     }
 
-    /**
-     * Display login menu
-     */
+// Display Login Menu
     private static void displayLoginMenu() {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║                 👤 CUSTOMER LOGIN                            ║");
+        System.out.println("║                        CUSTOMER LOGIN                        ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║                                                              ║");
         System.out.println("║  [1] Login with Customer ID                                  ║");
@@ -66,10 +51,7 @@ public class visitorLogIn {
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
     }
 
-    /**
-     * Handle customer login with ID
-     * @param sc Scanner instance
-     */
+// Handle customer login with ID
     private static void handleCustomerLogin(Scanner sc) {
         int attempts = 0;
         boolean loggedIn = false;
@@ -81,47 +63,41 @@ public class visitorLogIn {
             
             int loginID = getValidIntInput(sc, "\nPlease enter your Customer ID: ", MIN_CUSTOMER_ID, MAX_CUSTOMER_ID);
 
-            System.out.println("\n🔍 Verifying your credentials...");
+            System.out.println("\nVerifying your credentials...");
             
             int result = repo.findCustomerByID(loginID);
 
             if (result != -1) {
-                System.out.println("\n✅ Login Successful!");
+                System.out.println("\n Login Successful!");
                 System.out.println("Welcome back to Theme Park Resort!");
                 loggedIn = true;
                 customerPortal.portalMenu(result, sc);
             } else {
                 attempts++;
-                System.out.println("\n❌ Customer ID not found.");
+                System.out.println("\nCustomer ID not found.");
                 
                 if (attempts < MAX_LOGIN_ATTEMPTS) {
                     System.out.println("Please try again or select 'I forgot my Customer ID' from the menu.");
                 } else {
-                    System.out.println("\n⚠️  Maximum login attempts reached.");
+                    System.out.println("\nMaximum login attempts reached.");
                     System.out.println("Please use the 'Forgot Customer ID' option or contact support.");
                 }
             }
         }
     }
 
-    /**
-     * Handle forgot customer ID recovery
-     * @param sc Scanner instance
-     */
+//Handle forgot customer ID recovery
     private static void handleForgotCustomerID(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║              🔍 CUSTOMER ID RECOVERY                         ║");
+        System.out.println("║                    CUSTOMER ID RECOVERY                      ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
-        System.out.println("║                                                              ║");
         System.out.println("║  Please provide the following information to retrieve        ║");
-        System.out.println("║  your Customer ID:                                           ║");
-        System.out.println("║                                                              ║");
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
         String forgotFullName = getValidStringInput(sc, "\nEnter your Full Name: ");
         String forgotContactNumber = getValidStringInput(sc, "Enter your registered Contact Number: ");
 
-        System.out.println("\n🔍 Searching customer records...");
+        System.out.println("\nSearching customer records...");
         
         // Add small delay for realism
         try {
@@ -134,18 +110,18 @@ public class visitorLogIn {
 
         if (foundID != -1) {
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║              ✅ CUSTOMER RECORD FOUND!                       ║");
+            System.out.println("║                     CUSTOMER RECORD FOUND!                   ║");
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             System.out.println("║                                                              ║");
             System.out.println("║  Your Customer ID is: " + padRight(String.valueOf(foundID), 35) + "║");
             System.out.println("║                                                              ║");
-            System.out.println("║  ⚠️  Please keep your Customer ID for future transactions.   ║");
+            System.out.println("║     Please keep your Customer ID for future transactions.    ║");
             System.out.println("║                                                              ║");
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
             
             handlePostRecoveryMenu(sc);
         } else {
-            System.out.println("\n❌ Customer Record Not Found");
+            System.out.println("\nCustomer Record Not Found");
             System.out.println("\nThe information provided does not match any records in our system.");
             System.out.println("Please check your information and try again.");
             
@@ -153,10 +129,8 @@ public class visitorLogIn {
         }
     }
 
-    /**
-     * Handle menu after successful ID recovery
-     * @param sc Scanner instance
-     */
+
+//Handle menu after successful ID recovery
     private static void handlePostRecoveryMenu(Scanner sc) {
         boolean inMenu = true;
         
@@ -185,10 +159,7 @@ public class visitorLogIn {
         }
     }
 
-    /**
-     * Handle menu after failed ID recovery
-     * @param sc Scanner instance
-     */
+// Handle menu after failed ID recovery
     private static void handleRecoveryFailureMenu(Scanner sc) {
         boolean inMenu = true;
         
@@ -214,10 +185,10 @@ public class visitorLogIn {
                     visitorRegistration vr = new visitorRegistration();
                     // Get age first for proper validation
                     int age = getValidIntInput(sc, "Please enter your age: ", 0, 120);
-                    if (age >= 16) {
+                    if (age >= 18) {
                         vr.register(age, sc);
                     } else {
-                        System.out.println("\n[!] You must be at least 16 years old to register independently.");
+                        System.out.println("\n[!] You must be at least 18 years old to register independently.");
                     }
                     inMenu = false;
                     break;
@@ -233,9 +204,7 @@ public class visitorLogIn {
         }
     }
 
-    /**
-     * Get valid integer input within range
-     */
+// Get valid integer input within range
     private static int getValidIntInput(Scanner sc, String prompt, int min, int max) {
         int input = -1;
         boolean valid = false;
@@ -260,9 +229,7 @@ public class visitorLogIn {
         return input;
     }
 
-    /**
-     * Get valid string input (non-empty)
-     */
+// Get valid string input (non-empty)
     private static String getValidStringInput(Scanner sc, String prompt) {
         String input = "";
         
@@ -278,9 +245,7 @@ public class visitorLogIn {
         return input.trim();
     }
     
-    /**
-     * Pad string to the right
-     */
+// Pad string to the right
     private static String padRight(String s, int n) {
         if (s == null) s = "";
         if (s.length() > n) s = s.substring(0, n - 3) + "...";
