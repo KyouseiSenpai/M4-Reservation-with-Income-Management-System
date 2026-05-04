@@ -1,32 +1,18 @@
 import java.time.LocalDate;
 import java.util.Scanner;
 
-/**
- * Visitor Registration Class - Handles new customer registration
- * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation for all fields
- * - Added proper error handling
- * - Removed unused class fields
- * - Fixed age validation logic
- * - Added confirmation before proceeding
- */
+// Visitor Registration Class - Handles new customer registration
 public class visitorRegistration {
 
     private static final Repository repo = Repository.getInstance();
-    private static final int MIN_REGISTRATION_AGE = 16;
+    private static final int MIN_REGISTRATION_AGE = 18;
     private static final int MAX_REGISTRATION_AGE = 120;
 
-    /**
-     * Register a new customer
-     * @param age The customer's age
-     * @param sc Scanner instance for input
-     */
+// Register a new customer
     public void register(int age, Scanner sc) {
         try {
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║              📝 NEW CUSTOMER REGISTRATION                    ║");
+            System.out.println("║                   NEW CUSTOMER REGISTRATION                  ║");
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
             System.out.println("\nPlease fill in the following information:\n");
 
@@ -60,19 +46,19 @@ public class visitorRegistration {
             boolean saved = repo.saveCustomer(newID, fullName, contactNumber, age);
             
             if (!saved) {
-                System.out.println("\n❌ Registration failed. Please try again later.");
+                System.out.println("\nRegistration failed. Please try again later.");
                 return;
             }
 
             // Display success message
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║              ✅ REGISTRATION SUCCESSFUL!                     ║");
+            System.out.println("║                  REGISTRATION SUCCESSFUL!                    ║");
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             System.out.println("║                                                              ║");
             System.out.println("║  Your Customer ID is: " + padRight(String.valueOf(newID), 35) + "║");
             System.out.println("║                                                              ║");
-            System.out.println("║  ⚠️  IMPORTANT: Please remember your Customer ID!            ║");
-            System.out.println("║       You'll need it for all future transactions.            ║");
+            System.out.println("║        IMPORTANT: Please remember your Customer ID!          ║");
+            System.out.println("║         You'll need it for all future transactions.          ║");
             System.out.println("║                                                              ║");
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
@@ -83,26 +69,23 @@ public class visitorRegistration {
             handlePostRegistrationMenu(newID, sc);
 
         } catch (Exception e) {
-            System.out.println("\n❌ An error occurred during registration: " + e.getMessage());
+            System.out.println("\nAn error occurred during registration: " + e.getMessage());
             System.out.println("Please try again or contact support.");
         }
     }
 
-    /**
-     * Read age verification information
-     * @param sc Scanner instance for input
-     */
+// Read age verification information
     public static void readAgeVerification(Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║                 📋 AGE VERIFICATION POLICY                   ║");
+        System.out.println("║                    AGE VERIFICATION POLICY                   ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║                                                              ║");
         System.out.println("║  The system checks the age of customers during registration. ║");
         System.out.println("║                                                              ║");
-        System.out.println("║  • Customers 16 years and older:                             ║");
+        System.out.println("║  • Customers 18 years and older:                             ║");
         System.out.println("║    Can register independently                                ║");
         System.out.println("║                                                              ║");
-        System.out.println("║  • Customers under 16 years old:                             ║");
+        System.out.println("║  • Customers under 18 years old:                             ║");
         System.out.println("║    Must be accompanied by a parent or guardian               ║");
         System.out.println("║    for registration                                          ║");
         System.out.println("║                                                              ║");
@@ -122,23 +105,19 @@ public class visitorRegistration {
         // If choice is 1, just return to the calling menu
     }
 
-    /**
-     * Handle post-registration menu options
-     * @param customerID The newly registered customer ID
-     * @param sc Scanner instance for input
-     */
+// Handle post-registration menu options
     private void handlePostRegistrationMenu(int customerID, Scanner sc) {
         int regChoice;
         boolean inMenu = true;
         
         do {
             System.out.println("\n┌─────────────────────────────────┐");
-            System.out.println("│    REGISTRATION COMPLETE!       │");
+            System.out.println("│      REGISTRATION COMPLETE!     │");
             System.out.println("├─────────────────────────────────┤");
-            System.out.println("│  What would you like to do?     │");
+            System.out.println("│    What would you like to do?   │");
             System.out.println("│                                 │");
-            System.out.println("│  [1] Proceed to Log In          │");
-            System.out.println("│  [0] Exit to Main Menu          │");
+            System.out.println("│      [1] Proceed to Log In      │");
+            System.out.println("│      [0] Exit to Main Menu      │");
             System.out.println("└─────────────────────────────────┘");
             
             regChoice = getValidIntInput(sc, "\nEnter your choice: ", 0, 1);
@@ -161,11 +140,7 @@ public class visitorRegistration {
         } while (inMenu);
     }
 
-    /**
-     * Get valid name input
-     * @param sc Scanner instance
-     * @return Validated full name
-     */
+// Get valid name input
     private String getValidName(Scanner sc) {
         String name;
         boolean valid = false;
@@ -188,11 +163,8 @@ public class visitorRegistration {
         return name;
     }
 
-    /**
-     * Get valid contact number input
-     * @param sc Scanner instance
-     * @return Validated contact number
-     */
+
+// Get valid contact number input
     private String getValidContactNumber(Scanner sc) {
         String contact;
         boolean valid = false;
@@ -216,14 +188,7 @@ public class visitorRegistration {
         return contact;
     }
 
-    /**
-     * Get valid integer input within range
-     * @param sc Scanner instance
-     * @param prompt Prompt message
-     * @param min Minimum value
-     * @param max Maximum value
-     * @return Valid integer
-     */
+// Get valid integer input within range
     private static int getValidIntInput(Scanner sc, String prompt, int min, int max) {
         int input = -1;
         boolean valid = false;
@@ -248,9 +213,7 @@ public class visitorRegistration {
         return input;
     }
     
-    /**
-     * Pad string to the right with spaces
-     */
+// Pad string to the right with spaces
     private String padRight(String s, int n) {
         if (s == null) s = "";
         if (s.length() > n) s = s.substring(0, n - 3) + "...";
