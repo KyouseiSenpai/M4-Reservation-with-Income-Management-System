@@ -8,10 +8,6 @@ import java.util.logging.Logger;
 
 /**
  * Finance Manager - Handles financial transactions and refunds
- * 
- * SQLITE VERSION - Changes:
- * - Replaced local ArrayLists with SQLite tables in resort.db
- * - Tables: financeTransactions, refunds
  */
 public class FinanceManager {
 
@@ -590,9 +586,6 @@ public class FinanceManager {
 
     /**
      * Record a transaction from the Payment Framework (called from checkIn)
-     * @param amount The transaction amount
-     * @param discountRate The discount rate applied
-     * @param paymentMethod The payment method used
      */
     public static void recordTransaction(double amount, double discountRate, String paymentMethod) {
         double vatAmount = amount * 1.12;
@@ -604,8 +597,6 @@ public class FinanceManager {
 
     /**
      * Record a membership upgrade transaction (called from membership)
-     * @param amount The upgrade fee amount
-     * @param paymentMethod The payment method used
      */
     public static void recordMembershipTransaction(double amount, String paymentMethod) {
         String description = String.format("VIP Membership Upgrade via %s", paymentMethod);
@@ -614,13 +605,6 @@ public class FinanceManager {
 
     /**
      * Process a refund request with full details (called from CRMSystem and checkIn)
-     * @param originalAmount The original transaction amount
-     * @param reason The reason for refund
-     * @param customerID The customer ID requesting refund
-     * @param customerName The customer name
-     * @param refundType The type of refund (TICKET, ROOM, MEMBERSHIP)
-     * @param paymentMethod The original payment method
-     * @return true if refund was processed successfully
      */
     public static boolean processRefund(double originalAmount, String reason, int customerID,
                                          String customerName, String refundType, String paymentMethod) {
