@@ -7,13 +7,6 @@ import java.time.format.DateTimeParseException;
 /**
  * Facility System Class - Manages rooms, housekeeping, maintenance, and facilities
  * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation for all inputs
- * - Added date validation
- * - Fixed potential null pointer exceptions
- * - Added proper error handling
- * - Improved display formatting
  */
 public class FacilitySystem {
 
@@ -22,7 +15,6 @@ public class FacilitySystem {
 
     /**
      * Show facility menu for admin
-     * @param sc Scanner instance
      */
     public static void showFacilityMenu(Scanner sc) {
 
