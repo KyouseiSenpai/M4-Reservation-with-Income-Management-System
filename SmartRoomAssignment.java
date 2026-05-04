@@ -1,34 +1,18 @@
 import java.util.Scanner;
 
-/**
- * Smart Room Assignment Class - Intelligently recommends the best room
- * 
- * REVISED VERSION - Bug Fixes:
- * - Fixed Scanner resource leak by accepting Scanner as parameter
- * - Added input validation
- * - Fixed potential null pointer exceptions
- * - Added proper error handling
- * - Improved display formatting
- */
+// Smart Room Assignment Class - Intelligently recommends the best room
 public class SmartRoomAssignment {
 
     private static final Repository repo = Repository.getInstance();
 
-    /**
-     * Intelligently recommends the best room based on guest profile
-     * @param customerID The customer ID
-     * @param guests Number of guests
-     * @param preferences Guest preferences
-     * @param sc Scanner instance
-     * @return Recommended room number or -1 if none available
-     */
+// Intelligently recommends the best room based on guest profile
     public static int recommendBestRoom(int customerID, int guests, String preferences, Scanner sc) {
         String membership = repo.getMembershipType(customerID);
         String customerName = repo.getCustomerName(customerID);
         int[] pastRooms = getGuestRoomHistory(customerID);
 
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           🤖 SMART ROOM RECOMMENDATION                       ║");
+        System.out.println("║                   SMART ROOM RECOMMENDATION                  ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.printf("║  Guest: %-52s ║%n", customerName);
         System.out.printf("║  Membership: %-47s ║%n", membership);
@@ -37,7 +21,7 @@ public class SmartRoomAssignment {
 
         // Display guest history if available
         if (pastRooms.length > 0) {
-            System.out.print("\n📜 Previous rooms: ");
+            System.out.print("\nPrevious rooms: ");
             for (int room : pastRooms) {
                 System.out.print(room + " ");
             }
@@ -48,7 +32,7 @@ public class SmartRoomAssignment {
 
         // VIP guests get premium rooms
         if ("VIP".equals(membership)) {
-            System.out.println("\n⭐ [VIP DETECTED] - Prioritizing premium accommodations");
+            System.out.println("\n[VIP DETECTED] - Prioritizing premium accommodations");
             recommendedRoom = findBestAvailable("Suite", guests);
             if (recommendedRoom == -1) {
                 recommendedRoom = findBestAvailable("Deluxe", guests);
@@ -57,13 +41,13 @@ public class SmartRoomAssignment {
 
         // Large groups need connecting/family rooms
         if (guests >= 4 && recommendedRoom == -1) {
-            System.out.println("\n👥 [LARGE GROUP] - Finding family/connecting rooms");
+            System.out.println("\n[LARGE GROUP] - Finding family/connecting rooms");
             recommendedRoom = findBestAvailable("Family", guests);
         }
 
         // Standard recommendation based on preferences
         if (recommendedRoom == -1) {
-            System.out.println("\n🔍 [STANDARD] - Finding room based on preferences");
+            System.out.println("\n[STANDARD] - Finding room based on preferences");
             if (preferences.contains("quiet")) {
                 recommendedRoom = findQuietRoom(guests);
             } else if (preferences.contains("view")) {
@@ -76,21 +60,17 @@ public class SmartRoomAssignment {
         // If guest stayed before, try same floor
         if (pastRooms.length > 0 && recommendedRoom == -1) {
             int preferredFloor = pastRooms[0] / 100;
-            System.out.println("\n🏨 [RETURNING GUEST] - Preferring floor " + preferredFloor);
+            System.out.println("\n[RETURNING GUEST] - Preferring floor " + preferredFloor);
             recommendedRoom = findRoomOnFloor(preferredFloor, guests);
         }
 
         return recommendedRoom;
     }
 
-    /**
-     * Interactive smart booking for customers
-     * @param customerID The customer ID
-     * @param sc Scanner instance
-     */
+// Interactive smart booking for customers
     public static void smartBookRoom(int customerID, Scanner sc) {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║              🤖 SMART ROOM BOOKING                           ║");
+        System.out.println("║                     SMART ROOM BOOKING                       ║");
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
         System.out.println("\nWelcome, " + repo.getCustomerName(customerID));
 
@@ -110,7 +90,7 @@ public class SmartRoomAssignment {
         int recommendedRoom = recommendBestRoom(customerID, guests, preference, sc);
 
         if (recommendedRoom == -1) {
-            System.out.println("\n❌ Sorry, no suitable rooms available for your preferences.");
+            System.out.println("\nSorry, no suitable rooms available for your preferences.");
             System.out.println("Showing all available rooms instead...");
             FacilitySystem.bookRoomForCustomer(customerID, sc);
             return;
@@ -119,12 +99,12 @@ public class SmartRoomAssignment {
         // Show recommendation details
         String[] roomDetails = repo.getRoomDetails(recommendedRoom);
         if (roomDetails == null) {
-            System.out.println("\n❌ Error retrieving room details.");
+            System.out.println("\nError retrieving room details.");
             return;
         }
 
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           ⭐ RECOMMENDED ROOM                                ║");
+        System.out.println("║                      RECOMMENDED ROOM                        ║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.printf("║  Room: %-54d ║%n", recommendedRoom);
         System.out.printf("║  Type: %-54s ║%n", roomDetails[1]);
@@ -165,13 +145,7 @@ public class SmartRoomAssignment {
         }
     }
 
-    /**
-     * Complete the booking with smart recommendation
-     * @param customerID The customer ID
-     * @param roomNumber The room number
-     * @param guests Number of guests
-     * @param sc Scanner instance
-     */
+// Complete the booking with smart recommendation
     private static void completeSmartBooking(int customerID, int roomNumber, int guests, Scanner sc) {
         System.out.print("\nEnter check-in date (YYYY-MM-DD): ");
         String checkInDate = sc.nextLine().trim();
@@ -181,34 +155,25 @@ public class SmartRoomAssignment {
 
         if (repo.bookRoom(roomNumber, customerID, checkInDate, checkOutDate, guests)) {
             System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-            System.out.println("║         ✅ ROOM BOOKED SUCCESSFULLY!                         ║");
+            System.out.println("║                  ROOM BOOKED SUCCESSFULLY!                   ║");
             System.out.println("╠══════════════════════════════════════════════════════════════╣");
             System.out.printf("║  Your smart-selected room is: %-32d ║%n", roomNumber);
             System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
             // Booking is automatically saved to tbl_roomBookings for future recommendations
         } else {
-            System.out.println("\n❌ Failed to book room. It may have been taken.");
+            System.out.println("\nFailed to book room. It may have been taken.");
         }
         
         pauseScreen(sc);
     }
 
-    /**
-     * Get guest's room history for recommendations
-     * @param customerID The customer ID
-     * @return Array of past room numbers
-     */
+//  Get guest's room history for recommendations
     private static int[] getGuestRoomHistory(int customerID) {
         return repo.getGuestRoomHistory(customerID);
     }
 
-    /**
-     * Find best available room by type
-     * @param roomType The room type
-     * @param guests Number of guests
-     * @return Room number or -1 if none available
-     */
+// Find best available room by type
     private static int findBestAvailable(String roomType, int guests) {
         String[][] rooms = repo.getAvailableRoomsByType(roomType);
         if (rooms == null) return -1;
@@ -222,11 +187,7 @@ public class SmartRoomAssignment {
         return -1;
     }
 
-    /**
-     * Find a quiet room (lower floor, away from elevators)
-     * @param guests Number of guests
-     * @return Room number or -1 if none available
-     */
+// Find a quiet room (lower floor, away from elevators)
     private static int findQuietRoom(int guests) {
         // Prefer rooms ending in 01-08 (away from elevator usually at ends)
         String[][] rooms = repo.getAvailableRooms();
@@ -246,11 +207,7 @@ public class SmartRoomAssignment {
         return findBestAvailable("Standard", guests);
     }
 
-    /**
-     * Find room with good view (higher floor)
-     * @param guests Number of guests
-     * @return Room number or -1 if none available
-     */
+// Find room with good view (higher floor)
     private static int findRoomWithView(int guests) {
         String[][] rooms = repo.getAvailableRooms();
         if (rooms == null) return -1;
@@ -271,12 +228,7 @@ public class SmartRoomAssignment {
         return bestRoom;
     }
 
-    /**
-     * Find room on specific floor
-     * @param floor The floor number
-     * @param guests Number of guests
-     * @return Room number or -1 if none available
-     */
+// Find room on specific floor
     private static int findRoomOnFloor(int floor, int guests) {
         String[][] rooms = repo.getAvailableRooms();
         if (rooms == null) return -1;
@@ -293,12 +245,10 @@ public class SmartRoomAssignment {
         return -1;
     }
 
-    /**
-     * Admin: View smart assignment analytics
-     */
+// Admin: View smart assignment analytics
     public static void showAssignmentAnalytics() {
         System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           📊 SMART ASSIGNMENT ANALYTICS                      ║");
+        System.out.println("║                  SMART ASSIGNMENT ANALYTICS                  ║");
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
         int totalBookings = repo.getTotalRoomBookings();
